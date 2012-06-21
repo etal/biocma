@@ -1,0 +1,9 @@
+Consensus Multiple Alignment format, using Biopython alignments.
+
+Features of the CMA format:
+
+- Sequence headers indicate #head and #tail residues
+- Alignments are pairwise versus the first "consensus" sequence (consensus
+  generally has no gaps)
+- Insertions are lowercase; deletions are dashes
+

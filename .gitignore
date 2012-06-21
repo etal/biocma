@@ -1,0 +1,15 @@
+# Generated build and distribution directories
+build
+dist
+
+# Backup & cache files
+*~
+*.bak
+*.swp
+*.log
+*.pyc
+*.pyo
+*.class
+
+# Hidden files from Mac OS X
+.DS_Store
