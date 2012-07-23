@@ -1,4 +1,11 @@
+BioCMA
+======
+
 Consensus Multiple Alignment format, using Biopython alignments.
+
+I/O support and relevant functionality for the Consensus Alignment Format (CMA).
+
+Biopython objects and conventions are used where possible.
 
 Features of the CMA format:
 
