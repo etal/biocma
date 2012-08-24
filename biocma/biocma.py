@@ -29,7 +29,7 @@ read = sugar.make_reader(parse)
 
 def write(msas, outfile):
     # ENH: keep the other block info through round-trip
-    blocks = [cma.collapse_to_consensus(msa._records) for msa in msas]
+    blocks = [cma.collapse_to_consensus(msa) for msa in msas]
     cma.write(blocks, outfile)
 
 
@@ -49,6 +49,7 @@ class ChainMultiAlignment(MultipleSeqAlignment):
     def __init__(self, records,
             # CMA-specific attributes here
             # one=1,
+            level=0,
             name=None,
             params=None,
             query_length=None,
@@ -56,6 +57,7 @@ class ChainMultiAlignment(MultipleSeqAlignment):
             ):
         # NB: alphabet is always protein; X is OK
         MultipleSeqAlignment.__init__(self, records, extended_protein)
+        self.level = level
         self.name = name
         self.params = params
         self.query_length = query_length
@@ -87,6 +89,7 @@ class ChainMultiAlignment(MultipleSeqAlignment):
         return cls(records,
                 # CMA attributes
                 # block['one'],
+                block['level'],
                 block['name'],
                 block['params'],
                 block['query_length'],

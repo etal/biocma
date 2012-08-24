@@ -54,9 +54,9 @@ def _parse_blocks(instream):
     """
     ilines = sugar.unblank(instream)
     for line in ilines:
-        if line.startswith('[0_('):
+        if line.startswith('['):
             # Start of block
-            one, name, seqcount, params = _parse_block_header(line)
+            level, one, name, seqcount, params = _parse_block_header(line)
             qlen, qchars = _parse_block_postheader(next(ilines))
             # Pass control to the sequence parser
             sequences = list(_parse_sequences(ilines, qlen))
@@ -64,7 +64,8 @@ def _parse_blocks(instream):
             if not len(sequences) == seqcount:
                 logging.warn("Expected %d sequences in block, found %d",
                              seqcount, len(sequences))
-            yield {'one': one,
+            yield {'level': level,
+                   'one': one,
                    'name': name,
                    # 'seqcount': seqcount,
                    'params': params,
@@ -86,7 +87,7 @@ def _parse_sequences(ilines, expect_qlen):
     """
     while True:
         first = next(ilines)
-        if first.startswith('_0].'):
+        if first.startswith('_') and first.endswith('].'):
             # End of sequences & end of block
             break
 
@@ -137,6 +138,7 @@ def _parse_block_header(line):
     """
     [0_(1)=fa2cma(8){go=10000,gx=2000,pn=1000.0,lf=0,rf=0}:
     """
+    level = line[1]
     one, _rest = line[4:].split(')=', 1)
     name, _rest = _rest.split('(', 1)
     seqcount, _rest = _rest.split(')', 1)
@@ -149,7 +151,7 @@ def _parse_block_header(line):
     #     # Couldn't convert params to key-val pairs, for whatever reason
     #     logging.warn("Failed to parse CMA params: %s", _rest[1:-2])
     #     params = {}
-    return int(one), name, int(seqcount), params
+    return int(level), int(one), name, int(seqcount), params
 
 
 def _parse_block_postheader(line):
@@ -269,7 +271,7 @@ def _format_block(block):
     # [0_(1)=structs.seq(12){go=19,gx=2,pn=5.0,lf=0,rf=0}:
     # (69)*****!***************************!!!******!******************!*******
     yield """\
-[0_({one})={name}({seqcount}){{{params}}}:
+[{level}_({one})={name}({seqcount}){{{params}}}:
 ({query_length}){query_chars}
 
 """.format(
@@ -281,7 +283,7 @@ def _format_block(block):
     for s in _format_sequences(block['sequences'], block['query_length']):
         yield s
     # Block close
-    yield "_0].\n"
+    yield "_%s].\n" % block['level']
 
 
 def _format_sequences(sequences, query_length):
@@ -339,7 +341,7 @@ def realign_seqs(block, gap_char='.', align_indels=False):
     return [''.join(row) for row in all_chars]
 
 
-def consensus2block(record):
+def consensus2block(record, level=0, name=None):
     """Convert a Biopython SeqRecord to a esbglib.cma block.
 
     Ungapping is handled here.
@@ -347,8 +349,9 @@ def consensus2block(record):
     cons_ungap = str(record.seq).replace('-', '').replace('.', '').upper()
     record.seq = cons_ungap
     return dict(
+            level=level, #record.annotations.get('level', 0),
             one=1,
-            name='esbglib',
+            name=name or record.id,
             params='go=10000,gx=2000,pn=1000.0,lf=0,rf=0',
             query_length=len(cons_ungap),
             query_chars='*'*len(cons_ungap),
@@ -397,6 +400,16 @@ def collapse_to_consensus(seqrecords, strict=False):
 
     The first record must be the consensus.
     """
+    level = 0
+    name = seqrecords[0].id
+    # If this is a CMA alignment, extract additional info:
+    if hasattr(seqrecords, '_records'):
+        if hasattr(seqrecords, 'level'):
+            level = seqrecords.level
+        if hasattr(seqrecords, 'name'):
+            name = seqrecords.name
+        seqrecords = seqrecords._records
+
     consensus = seqrecords.pop(0)
     cons_length = len(consensus)
     for i, s in enumerate(seqrecords):
@@ -421,7 +434,7 @@ def collapse_to_consensus(seqrecords, strict=False):
 
     consensus.seq = replace_asterisks(consensus.seq, 'consensus')
     # Start a block with the consensus sequence
-    block = consensus2block(consensus)
+    block = consensus2block(consensus, level=level, name=name)
     qlen = block['query_length']
 
     # Collapse & add remaining sequences to the block
