@@ -23,6 +23,6 @@ setup(  name='BioCMA',
         author_email='eric.talevich@gmail.com',
         url='http://github.com/etal/biocma',
         packages=['biocma'],
-        scripts=glob('scripts/*'),
+        #scripts=glob('scripts/*'),
         )
 
