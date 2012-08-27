@@ -27,9 +27,9 @@ def parse(infile):
 read = sugar.make_reader(parse)
 
 
-def write(msas, outfile):
+def write(msas, outfile, do_iron=True):
     # ENH: keep the other block info through round-trip
-    blocks = [cma.collapse_to_consensus(msa) for msa in msas]
+    blocks = [cma.collapse_to_consensus(msa, do_iron=do_iron) for msa in msas]
     cma.write(blocks, outfile)
 
 

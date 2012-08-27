@@ -393,7 +393,7 @@ def replace_asterisks(seq, label=None):
     return str(seq).replace('*', 'X')
 
 
-def collapse_to_consensus(seqrecords, strict=False):
+def collapse_to_consensus(seqrecords, strict=False, do_iron=True):
     """Opposite of realign_seqs.
 
     Input sequences should all be the same length.
@@ -419,7 +419,7 @@ def collapse_to_consensus(seqrecords, strict=False):
             % (i+2, len(s), cons_length))
 
     if '.' in str(consensus.seq):
-        # Strict -- warn if there's a '-'
+        # Strict -- error if there's a '-'
         if '-' in str(consensus.seq):
             if strict:
                 raise ValueError("Consensus contains '-' gap characters")
@@ -458,9 +458,69 @@ def collapse_to_consensus(seqrecords, strict=False):
                 if char not in '-.' and not is_beginning:
                     new_mol_seq.append(char.lower())
         rec.seq = ''.join(new_mol_seq)
+        if do_iron:
+            rec.seq = iron(rec.seq)
         block['sequences'].append(seqrecord2sequence(rec, qlen, index))
 
     return block
+
+
+def iron(sequence):
+    """'Iron out' indel regions so insertions precede deletions.
+    
+    Given a CMA string like:
+        AAAAaa--aa-a--aAAA
+    Result:
+        AAAAaaaaaa-----AAA
+
+    Procedure:
+        - Check if any deletion-insertion transition appears
+        - If so, in each indel region:
+            - Count and remove gap ('-') characters
+            - Reassemble the indel region with inserts, then deletions
+    """
+    in_indel = False #?
+    seen_dels = 0
+    inserts = []
+    outchars = []
+    if not re.search(r'-[a-y]', sequence):
+        # no del-ins transitions
+        return sequence
+    for char in sequence:
+        if not in_indel:
+            if char.isupper():
+                assert not inserts
+                assert not seen_dels
+                outchars.append(char)
+            elif char == '-':
+                in_indel = True
+                seen_dels += 1
+            else:
+                assert char.islower()
+                in_indel = True
+                inserts.append(char)
+        else:
+            if char.isupper():
+                in_indel = False
+                outchars.extend(inserts)
+                outchars.append('-' * seen_dels)
+                outchars.append(char)
+                seen_dels = 0
+                inserts = []
+            elif char == '-':
+                seen_dels += 1
+            else:
+                assert char.islower()
+                inserts.append(char)
+    if in_indel:
+        outchars.extend(inserts)
+        outchars.append('-' * seen_dels)
+    outsequence = ''.join(outchars)
+    assert (len(outsequence) == len(sequence) and
+            outsequence.replace('-', '') == sequence.replace('-', '')), \
+            '\nOrig: ' + sequence + \
+            '\nIron: ' + outsequence
+    return outsequence
 
 
 # --------------------------------------------------------------------
