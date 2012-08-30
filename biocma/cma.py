@@ -466,61 +466,109 @@ def collapse_to_consensus(seqrecords, strict=False, do_iron=True):
 
 
 def iron(sequence):
-    """'Iron out' indel regions so insertions precede deletions.
-    
-    Given a CMA string like:
-        AAAAaa--aa-a--aAAA
-    Result:
-        AAAAaaaaaa-----AAA
+    """'Iron out' indel regions in the aligned sequence.
 
-    Procedure:
-        - Check if any deletion-insertion transition appears
-        - If so, in each indel region:
-            - Count and remove gap ('-') characters
-            - Reassemble the indel region with inserts, then deletions
+    Any inserts next to deletions are converted to matches (uppercase).
+
+    Given a CMA string like:
+        AAAAbc--de-f--gAAA
+    Result:
+        AAAABCDEFgAAA
     """
-    in_indel = False #?
-    seen_dels = 0
-    inserts = []
-    outchars = []
-    if not re.search(r'-[a-y]', sequence):
-        # no del-ins transitions
-        return sequence
-    for char in sequence:
-        if not in_indel:
-            if char.isupper():
-                assert not inserts
-                assert not seen_dels
-                outchars.append(char)
-            elif char == '-':
-                in_indel = True
-                seen_dels += 1
+    r_indel = re.compile(r'(-[a-y]|[a-y]-)')
+    orig_sequence = sequence
+    while r_indel.search(sequence):
+        in_insert = False
+        in_gap = False
+        seen_gaps = 0
+        inserts = []
+        outchars = []
+
+        for char in sequence:
+            if in_insert:
+                if char.islower():
+                    # Extend the insert
+                    inserts.append(char)
+                elif char.isupper():
+                    # Indel is over; 'iron' out & emit inserts, then gaps
+                    in_insert = False
+                    outchars.extend(inserts)
+                    inserts = []
+                    outchars.append('-' * seen_gaps)
+                    seen_gaps = 0
+                    outchars.append(char)
+                else:
+                    # Convert a preceding indel char to a 'match' (uppercase)
+                    # If the indel and gap are both multiple chars, this will
+                    # capitalize the insert left-to-right, then leave any gap
+                    # remainer as-is.
+                    assert char == '-'
+                    if not inserts:
+                        in_insert = False
+                        in_gap = True
+                        seen_gaps += 1
+                    else:
+                        outchars.append(inserts.pop(0).upper())
+                        # NB: Only leave the insert region if we've finished
+                        # converting all the insert chars
+                        if not inserts:
+                            in_insert = False
+                            in_gap = True
+
+            elif in_gap:
+                if char.islower():
+                    in_insert = True
+                    in_gap = False
+                    # If some inserts previously seen, emit them now
+                    # If no inserts have been seen yet, we'll iron this indel
+                    if inserts:
+                        outchars.extend(inserts)
+                        outchars.append('-' * seen_gaps)
+                        seen_gaps = 0
+                    inserts = [char]
+                elif char.isupper():
+                    in_gap = False
+                    # End of the gap -- emit
+                    if inserts:
+                        outchars.extend(inserts)
+                        inserts = []
+                    outchars.append('-' * seen_gaps)
+                    seen_gaps = 0
+                    outchars.append(char)
+                else:
+                    # Extend the gap
+                    assert char == '-'
+                    seen_gaps += 1
+
             else:
-                assert char.islower()
-                in_indel = True
-                inserts.append(char)
-        else:
-            if char.isupper():
-                in_indel = False
-                outchars.extend(inserts)
-                outchars.append('-' * seen_dels)
-                outchars.append(char)
-                seen_dels = 0
-                inserts = []
-            elif char == '-':
-                seen_dels += 1
-            else:
-                assert char.islower()
-                inserts.append(char)
-    if in_indel:
-        outchars.extend(inserts)
-        outchars.append('-' * seen_dels)
-    outsequence = ''.join(outchars)
-    assert (len(outsequence) == len(sequence) and
-            outsequence.replace('-', '') == sequence.replace('-', '')), \
-            '\nOrig: ' + sequence + \
-            '\nIron: ' + outsequence
-    return outsequence
+                assert not inserts and not seen_gaps, (
+                    "Inserts: %s, gaps: %s, seq: %s, in_ins=%s, in_gap=%s"
+                    % (inserts, seen_gaps, sequence, in_insert, in_gap))
+                # Coming from Match state
+                if char.isupper():
+                    # Extend the match
+                    outchars.append(char)
+                elif char.islower():
+                    inserts.append(char)
+                    in_insert = True
+                else:
+                    assert char == '-'
+                    seen_gaps += 1
+                    in_gap = True
+
+        # Emit any trailing indel
+        if inserts:
+            outchars.extend(inserts)
+        if seen_gaps:
+            outchars.append('-' * seen_gaps)
+        sequence = ''.join(outchars)
+        # logging.info(sequence)
+        assert (sequence.replace('-', '').upper()
+                ==
+                orig_sequence.replace('-', '').upper()), \
+                '\nOrig: ' + orig_sequence + \
+                '\nIron: ' + sequence
+    return sequence
 
 
 # --------------------------------------------------------------------
