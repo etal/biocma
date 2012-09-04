@@ -1,0 +1,59 @@
+#!/usr/bin/env python
+
+"""Tweak CMA-format-specific aspects/features of a CMA file.
+
+Example:
+    cma-tweak foo.cma --iron --level=1 --name=Testfam
+
+"""
+
+from biocma import biocma, cma, utils
+from biofrills import consensus
+
+
+def main(args):
+    for msa in biocma.parse(args.infile):
+        if args.add_consensus:
+            # TODO - grab consensus w/ biofrills
+            # insert it into the sequence list
+            pass
+        if args.level:
+            msa.level = args.level
+        biocma.write([msa], args.output, do_iron=args.iron)
+
+
+        # if args.iron:
+        #     for sequence in enumerate(blocks['sequences']):
+        #         sequence['seq'] = cma.iron(sequence['seq'])
+
+        # if args.level:
+            # write with level=args.level
+            # pass
+        # cma.write([block], args.output)
+
+
+if __name__ == '__main__':
+    import argparse
+    import sys
+
+    AP = argparse.ArgumentParser()
+    AP.add_argument('infile',
+                    default=sys.stdin, type=argparse.FileType('r'),
+                    help="Input file in CMA format.")
+    AP.add_argument('-c', '--add-consensus',
+                    action='store_true',
+                    help="""Add the consensus sequence.""")
+    AP.add_argument('--iron',
+                    action='store_true',
+                    help="""'Iron out' indels to remove deletion/insertion
+                    transitions.""")
+    AP.add_argument('-l', '--level',
+                    default=0, type=int, # require integer...
+                    help="""Set the CMA block level. (Only for single-block
+                    files.)""")
+    AP.add_argument('-o', '--output',
+                    default=sys.stdout, type=argparse.FileType('w'),
+                    help="Output file -- will be in CMA format.")
+
+    main(AP.parse_args())
+
