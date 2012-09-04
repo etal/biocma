@@ -3,8 +3,7 @@
 import unittest
 from cStringIO import StringIO
 
-from biocma import cma
-from biocma import biocma
+from biocma import biocma, cma
 
 class IOTests(unittest.TestCase):
     """Tests for parsing and writing the CMA format."""
@@ -16,6 +15,14 @@ class IOTests(unittest.TestCase):
 
 class UtilTests(unittest.TestCase):
     """Tests for utility functions."""
+
+    def test_iron(self):
+        seq = '-a-a-LLLGQPIFPGDSGVDQLVEIIKVLgtptre---qiremnpnyteFKFPQIK' \
+                '---ahpwtkvfrprtPPEAIALCSRLLEYTPTARLT-----PLEACAHSFF-'
+        iseq = cma.iron(seq)
+        self.assertEqual(len(seq.replace('-', '')),
+                         len(iseq.replace('-', '')))
+
 
 
 # ---------------------------------------------------------
