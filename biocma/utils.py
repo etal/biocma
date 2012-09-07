@@ -33,6 +33,33 @@ def find_seq_id(block, name, case_sensitive=True):
     return rec['id']
 
 
+def get_consensus(block):
+    """Calculate a simple consensus sequence for the block."""
+    from collections import Counter
+
+    # Take aligned (non-insert) chars from all rows; transpose
+    columns = zip(*[[c for c in row['seq'] if not c.islower()]
+                    for row in block['sequences']])
+    cons_chars = [Counter(col).most_common()[0][0] for col in columns]
+    cons_chars = [c if c != '-' else 'X' for c in cons_chars]
+    assert len(cons_chars) == block['query_length']
+    cons_sequence = {
+        'index': 1,
+        'id': 'consensus',
+        'description': '',
+        'dbxrefs': {},
+        'phylum': '',
+        'taxchar': '',
+        'head_len': None,
+        'tail_len': None,
+        'head_seq': '',
+        'tail_seq': '',
+        'length': block['query_length'],
+        'seq': ''.join(cons_chars),
+    }
+    return cons_sequence
+
+
 def get_conservation(block):
     """Calculate conservation levels at each consensus position.
 
