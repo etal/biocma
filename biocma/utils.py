@@ -160,10 +160,12 @@ def get_inserts(block):
     """Identify the inserts in sequence in a block.
 
     Inserts are relative to the consensus (theoretically), and identified by
-    lowercase letters in the sequence.
-    
+    lowercase letters in the sequence. The returned integer pairs represent the
+    insert start and end positions in the full-length sequence, using one-based
+    numbering.
+
     The first sequence of the CMA block is included, though it may just be the
-    consensus sequence, which shouldn't have any indels.
+    consensus sequence, which shouldn't have any inserts.
 
     Output:
         {id1: [(start, end), (start, end), ...], id2: ..., ...}
