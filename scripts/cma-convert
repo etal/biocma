@@ -3,28 +3,43 @@
 """Convert a CMA file to another alignment format.
 
 Usage:
-    cma-convert.py to_format [cma file] > outfile
+    cma-convert -o to_format [cma-file] > out-alignment-file
+    cma-convert -i from_format [alignment-file] > out-cma-file
 """
-# TODO - auto-generate a list of supported AlignIO formats
-#   - display these w/ '-h'
 
 import sys
-from Bio import AlignIO
+import argparse
+from Bio import AlignIO, SeqIO
 from biocma import biocma
 
-if len(sys.argv) == 2:
-    infile = sys.stdin
-    do_close = False
-elif len(sys.argv) == 3:
-    infile = open(sys.argv[2])
-    do_close = True
-else:
+AP = argparse.ArgumentParser()
+AP.add_argument('-o', '--outformat')
+AP.add_argument('-i', '--informat')
+AP.add_argument('infile', nargs='?',
+                type=argparse.FileType('r'), default=sys.stdin)
+args = AP.parse_args()
+if sum(map(bool, (args.outformat, args.informat))) != 1:
     sys.exit(__doc__)
 
-outfmt = sys.argv[1]
-records = biocma.parse(infile)
-count = AlignIO.write(records, sys.stdout, outfmt)
-print >>sys.stderr, "cma-convert.py: Converted %d alignment(s)" % count
-if do_close:
-    infile.close()
+all_outformats = set(AlignIO._FormatToWriter.keys()
+                     + SeqIO._FormatToWriter.keys())
+all_informats = set(AlignIO._FormatToIterator.keys()
+                    + SeqIO._FormatToIterator.keys())
+
+if args.outformat:
+    if args.outformat not in all_outformats:
+        print >>sys.stderr, "Invalid output format '%s'" % args.outformat
+        sys.exit("Supported output formats:\n\t"
+                 + '\n\t'.join(sorted(all_outformats)))
+
+    records = biocma.parse(args.infile)
+    count = AlignIO.write(records, sys.stdout, args.outformat)
+else:
+    if args.informat not in all_informats:
+        print >>sys.stderr, "Invalid input format '%s'" % args.informat
+        sys.exit("Supported input formats:\n\t"
+                 + '\n\t'.join(sorted(all_informats)))
+
+    records = AlignIO.parse(args.infile, args.informat)
+    biocma.write(records, sys.stdout)
 
