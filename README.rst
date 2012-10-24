@@ -8,8 +8,25 @@ I/O support and relevant functionality for the Consensus Alignment Format (CMA).
 Biopython objects and conventions are used where possible.
 
 
-What can CMA do for me?
------------------------
+Installation
+------------
+
+This is an ordinary Python package. You can install it from source with the
+setup.py script::
+
+    python setup.py build
+    python setup.py install
+
+Some scripts that I find useful are in the scripts/ directory. By default these
+are not installed, but you can include them by uncommenting the line in setup.py
+that starts with ``scripts=glob``...
+
+Alternatively, you can just copy those scripts into another directory in your
+``$PATH``.
+
+
+What can the CMA format do for me?
+----------------------------------
 
 - Like the A2M and Stockholm formats, alignments are shown with insertions as
   lowercase characters and deletions are dashes
