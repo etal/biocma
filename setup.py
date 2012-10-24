@@ -17,7 +17,7 @@ except:
     from distutils.core import setup
 
 setup(
-    name='BioCMA',
+    name='biocma',
     version='0.1.0',
     description=__doc__,
     author='Eric Talevich',
