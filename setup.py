@@ -1,14 +1,6 @@
 #!/usr/bin/env python
 
-"""I/O and utilities for the Consensus Multiple Alignment (CMA) file format.
-
-This format represents protein sequence alignments. It is used by a few tools by
-Dr. Andrew F. Neuwald, notably CHAIN and MAPGAPS.
-
-See:
-    - http://chain.igs.umaryland.edu/
-    - http://mapgaps.igs.umaryland.edu/
-"""
+"""I/O and utilities for the Consensus Multiple Alignment (CMA) file format."""
 
 from glob import glob
 try:

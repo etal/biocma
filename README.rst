@@ -4,6 +4,11 @@ BioCMA
 Consensus Multiple Alignment format, using Biopython alignments.
 
 I/O support and relevant functionality for the Consensus Alignment Format (CMA).
+This format represents protein sequence alignments. It is used by a few tools by
+Dr. Andrew F. Neuwald, notably CHAIN_ and MAPGAPS_.
+
+.. _CHAIN: http://chain.igs.umaryland.edu/
+.. _MAPGAPS: http://mapgaps.igs.umaryland.edu/
 
 Biopython objects and conventions are used where possible.
 
