@@ -16,13 +16,22 @@ try:
 except:
     from distutils.core import setup
 
-setup(  name='BioCMA',
-        version='dev',
-        description=__doc__,
-        author='Eric Talevich',
-        author_email='eric.talevich@gmail.com',
-        url='http://github.com/etal/biocma',
-        packages=['biocma'],
-        #scripts=glob('scripts/*'),
-        )
+setup(
+    name='BioCMA',
+    version='0.1.0',
+    description=__doc__,
+    author='Eric Talevich',
+    author_email='eric.talevich@gmail.com',
+    url='http://github.com/etal/biocma',
+    classifiers=[
+        'Development Status :: 3 - Alpha',
+        'Intended Audience :: Science/Research',
+        'License :: OSI Approved :: BSD License',
+        'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: Implementation :: PyPy',
+        'Topic :: Scientific/Engineering :: Bio-Informatics',
+    ],
+    packages=['biocma'],
+    #scripts=glob('scripts/*'),
+)
 
