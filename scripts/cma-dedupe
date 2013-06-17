@@ -1,0 +1,40 @@
+#!/usr/bin/env python
+
+"""Deduplicate a CMA file, keeping the "best" seq for each unique ID."""
+
+import collections
+import copy
+import sys
+
+from biocma import cma
+
+cmaln = cma.read(sys.argv[1])
+
+def upperlen(seq):
+    """Score of a sequence hit: number of uppercase (match) characters"""
+    return sum(map(str.isupper, seq))
+
+# Index of seqs and scores -- dict of seq_id: (global_idx, score)
+seenseqs = collections.defaultdict(list)
+for idx, sequence in enumerate(cmaln['sequences']):
+    seenseqs[sequence['id']].append((idx, upperlen(sequence['seq'])))
+
+# Global indices of duplicate, lower-scoring sequences (to be dropped)
+drop_idxs = set()
+for seqid, pairs in seenseqs.iteritems():
+    assert len(pairs), pairs
+    if len(pairs) > 1:
+        # Choose the best idx, add the rest to drop_idxs
+        pairs.sort(key=lambda idx_score: idx_score[1])
+        drop_idxs.update([idx for idx, score in pairs[:-1]])
+
+# Create a copy of the alignment minus the dupes
+new_aln = copy.deepcopy(cmaln)
+del new_aln['sequences']
+new_aln['sequences'] = [sequence
+                        for idx, sequence in enumerate(cmaln['sequences'])
+                        if idx not in drop_idxs]
+
+print >>sys.stderr, "Dropped", len(drop_idxs), "duplicate sequences"
+
+cma.write(new_aln, sys.stdout)
