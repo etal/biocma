@@ -10,7 +10,7 @@ except:
 
 setup(
     name='biocma',
-    version='0.1.0',
+    version='0.2',
     description=__doc__,
     author='Eric Talevich',
     author_email='eric.talevich@gmail.com',
