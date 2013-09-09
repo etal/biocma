@@ -7,18 +7,19 @@ from Bio import SeqIO
 
 from biocma import biocma, cma, utils
 
-SINGLE_CMA = "fikk.cma"
+EX_CMA = "fikk.cma"
+EX_FASTA = "fikk-full.fasta"
 
 class IOTests(unittest.TestCase):
     """Tests for parsing and writing the CMA format."""
 
     def test_read(self):
-        block = cma.read(SINGLE_CMA)
+        block = cma.read(EX_CMA)
         self.assertEqual(len(block['sequences']), 24)
         self.assertEqual(block['query_length'], block['sequences'][0]['length'])
 
     def test_parse(self):
-        blocks = list(cma.parse(SINGLE_CMA))
+        blocks = list(cma.parse(EX_CMA))
         self.assertEqual(len(blocks), 1)
 
 
@@ -26,7 +27,7 @@ class BioTests(unittest.TestCase):
     """Tests for the Biopython wrapper."""
 
     def test_read(self):
-        aln = biocma.read(SINGLE_CMA)
+        aln = biocma.read(EX_CMA)
 
 
 class UtilTests(unittest.TestCase):
@@ -40,10 +41,10 @@ class UtilTests(unittest.TestCase):
                          len(iseq.replace('-', '')))
 
     def test_get_inserts(self):
-        block = cma.read(SINGLE_CMA)
+        block = cma.read(EX_CMA)
         inserts = utils.get_inserts(block)
         self.assertEqual(len(inserts), len(block['sequences']))
-        fullseqs = SeqIO.to_dict(SeqIO.parse("fikk-full.fasta", 'fasta'))
+        fullseqs = SeqIO.to_dict(SeqIO.parse(EX_FASTA, 'fasta'))
         for sequence, targets in (
             (block['sequences'][1], ['n', 't', 'fyklyllkkydsntlfnv']),
             (block['sequences'][-1], ['altkl', 'nkl',
