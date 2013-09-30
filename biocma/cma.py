@@ -62,8 +62,8 @@ def _parse_blocks(instream):
             sequences = list(_parse_sequences(ilines, qlen))
             # Validation
             if not len(sequences) == seqcount:
-                logging.warn("Expected %d sequences in block, found %d",
-                             seqcount, len(sequences))
+                logging.warn("Expected %d sequences in block %s, found %d",
+                             seqcount, name, len(sequences))
             yield {'level': level,
                    'one': one,
                    'name': name,
@@ -91,10 +91,19 @@ def _parse_sequences(ilines, expect_qlen):
             # End of sequences & end of block
             break
 
-        index, this_len, query_len = _parse_seq_preheader(first)
+        # ENH: handle wrapped lines?
+        try:
+            index, this_len, query_len = _parse_seq_preheader(first)
+        except ValueError:
+            logging.warn('Unparseable line (SKIPPING):\n%s', first)
+            continue
         (rec_id, dbxrefs, headlen, taillen, phylum, taxchar, description
                 ) = _parse_seq_header(next(ilines))
-        headseq, molseq, tailseq = _parse_seq_body(next(ilines))
+        try:
+            headseq, molseq, tailseq = _parse_seq_body(next(ilines))
+        except ValueError:
+            logging.warn('Unparseable sequence: %s -- SKIPPING', rec_id)
+            continue
 
         # Validation
         if expect_qlen != query_len:
@@ -171,6 +180,8 @@ def _parse_seq_preheader(line):
     $3=227(209):
     """
     match = re.match(r"\$ (\d+) = (\d+) \( (\d+) \):", line, re.VERBOSE)
+    if not match:
+        raise ValueError("Unparseable header: " + line)
     index, this_len, query_len = match.groups()
     return map(int, (index, this_len, query_len))
 
@@ -249,9 +260,28 @@ def _parse_seq_body(line):
 
     {()YVPFARKYRPKFFREVIGQEAPVRILKALNcknpskgepcgereiDRGVFPDVRA-LKLLDQASVYGE()}*
     MENINNI{()----------FKLILVGDGKFFSSSGEIIFNIWDTKFGGLRDGYYRLTYKNEDDM()}*
+
+    Or:
+
+    {(HY)ELPWVEKYR...
+
+    The sequence fragments in parentheses represent N- or C-terminal flanking
+    regions that are not part of the alignment block (I think). Most tools don't
+    include them, but some do, apparently.
     """
-    head, _rest = line.rstrip('*').split('{()', 1)
-    molseq, tail = _rest.split('()}', 1)
+    line = line.rstrip('*')
+    if '{()' in line:
+        head, _rest = line.split('{()', 1)
+    else:
+        # Match parens
+        _rest = line.split('{(', 1)[1]
+        head, _rest = _rest.split(')', 1)
+    if '()}' in _rest:
+        molseq, tail = _rest.split('()}', 1)
+    else:
+        # Match parens
+        molseq, _rest = _rest.split('(', 1)
+        tail = _rest.split(')}', 1)[0]
     return (head, molseq, tail)
 
 
