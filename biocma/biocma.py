@@ -12,7 +12,6 @@ See:
 
 from Bio import AlignIO
 from Bio.Align import MultipleSeqAlignment
-from Bio.Alphabet.IUPAC import extended_protein
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 
@@ -55,8 +54,7 @@ class ChainMultiAlignment(MultipleSeqAlignment):
             query_length=None,
             query_chars=None,
             ):
-        # NB: alphabet is always protein; X is OK
-        MultipleSeqAlignment.__init__(self, records, extended_protein)
+        MultipleSeqAlignment.__init__(self, records)
         self.level = level
         self.name = name
         self.params = params
@@ -67,11 +65,13 @@ class ChainMultiAlignment(MultipleSeqAlignment):
     def from_block(cls, block):
         """Instantiate this class given a raw block (see parse_raw)."""
         rseqs = cma.realign_seqs(block)
-        records = (SeqRecord(Seq(rseq, extended_protein),
+        records = (SeqRecord(Seq(rseq),
                     id=bseq['id'],
                     description=bseq['description'],
-                    dbxrefs=bseq['dbxrefs'].values(),   # list of strings
+                    dbxrefs=list(bseq['dbxrefs'].values()),
                     annotations=dict(
+                        # NB: always protein; X is OK
+                        molecule_type='protein',
                         index=bseq['index'],
                         length=bseq['length'],
                         dbxrefs=bseq['dbxrefs'],

@@ -369,13 +369,17 @@ def realign_seqs(block, gap_char='.', align_indels=False):
     return [''.join(row) for row in all_chars]
 
 
-def consensus2block(record, level=0, name=None):
+def consensus2block(record, level=0, name=None, molseq=None):
     """Convert a Biopython SeqRecord to a esbglib.cma block.
 
     Ungapping is handled here.
+
+    `molseq`: if given, a string used in place of the record's own sequence.
+    The record is not modified.
     """
-    cons_ungap = str(record.seq).replace('-', '').replace('.', '').upper()
-    record.seq = cons_ungap
+    if molseq is None:
+        molseq = str(record.seq)
+    cons_ungap = molseq.replace('-', '').replace('.', '').upper()
     return dict(
             level=level, #record.annotations.get('level', 0),
             one=1,
@@ -383,20 +387,19 @@ def consensus2block(record, level=0, name=None):
             params='go=10000,gx=2000,pn=1000.0,lf=0,rf=0',
             query_length=len(cons_ungap),
             query_chars='*'*len(cons_ungap),
-            sequences=[seqrecord2sequence(record, len(cons_ungap), 1)]
+            sequences=[seqrecord2sequence(record, len(cons_ungap), 1,
+                                          molseq=cons_ungap)]
             )
 
 
-def seqrecord2sequence(record, qlen, index):
+def seqrecord2sequence(record, qlen, index, molseq=None):
     """Convert a Biopython SeqRecord to a esbglib.cma block.
 
-    Indels (gaps, casing) must have already been handled in the record.
+    Indels (gaps, casing) must have already been handled in the record or, if
+    given, in `molseq`, a string used in place of the record's own sequence.
     """
-    # aligned_len = sum(map(str.isupper, str(record.seq)))
-    # assert qlen == aligned_len, (
-    #         "Aligned sequence length %s, query %s\n%s"
-    #         % (aligned_len, qlen, str(record)))
-
+    if molseq is None:
+        molseq = str(record.seq)
     description = (record.description.split(' ', 1)[1]
             if ' ' in record.description
             else ' ')
@@ -410,8 +413,8 @@ def seqrecord2sequence(record, qlen, index):
                 tail_len=None,
                 head_seq='',
                 tail_seq='',
-                length=len(record.seq) - record.seq.count('-'),
-                seq=str(record.seq),
+                length=len(molseq) - molseq.count('-'),
+                seq=molseq,
                 )
 
 def replace_asterisks(seq, label=None):
@@ -429,45 +432,39 @@ def collapse_to_consensus(seqrecords, strict=False, do_iron=True):
 
     The first record must be the consensus.
     """
-    level = 0
-    name = seqrecords[0].id
-    # If this is a CMA alignment, extract additional info:
-    if hasattr(seqrecords, '_records'):
-        if hasattr(seqrecords, 'level'):
-            level = seqrecords.level
-        if hasattr(seqrecords, 'name'):
-            name = seqrecords.name
-        seqrecords = seqrecords._records
-
-    consensus = seqrecords.pop(0)
-    cons_length = len(consensus)
-    for i, s in enumerate(seqrecords):
+    level = getattr(seqrecords, 'level', 0)
+    name = getattr(seqrecords, 'name', None)
+    # rows is a new list; the caller's input is not modified
+    consensus, *rows = seqrecords
+    cons_seq = str(consensus.seq)
+    cons_length = len(cons_seq)
+    for i, s in enumerate(rows):
         if len(s) != cons_length:
             raise ValueError(
             "Sequence #%d has length %d, consensus is %d"
             % (i+2, len(s), cons_length))
 
-    if '.' in str(consensus.seq):
+    if '.' in cons_seq:
         # Strict -- error if there's a '-'
-        if '-' in str(consensus.seq):
+        if '-' in cons_seq:
             if strict:
                 raise ValueError("Consensus contains '-' gap characters")
             logging.warning("Consensus sequence contains both '.' and '-' gap "
                             "characters -- is it really the consensus?")
-            aligned_cols = [(c not in '.-') for c in str(consensus.seq)]
+            aligned_cols = [(c not in '.-') for c in cons_seq]
         else:
-            aligned_cols = [c != '.' for c in str(consensus.seq)]
+            aligned_cols = [c != '.' for c in cons_seq]
     else:
         # A little more ambiguous...
-        aligned_cols = [c != '-' for c in str(consensus.seq)]
+        aligned_cols = [c != '-' for c in cons_seq]
 
-    consensus.seq = replace_asterisks(consensus.seq, 'consensus')
     # Start a block with the consensus sequence
-    block = consensus2block(consensus, level=level, name=name)
+    block = consensus2block(consensus, level=level, name=name,
+                            molseq=replace_asterisks(cons_seq, 'consensus'))
     qlen = block['query_length']
 
     # Collapse & add remaining sequences to the block
-    for index, rec in enumerate(seqrecords, 2):
+    for index, rec in enumerate(rows, 2):
         # Collapse rec.seq down to aligned size
         new_mol_seq = []
         is_beginning = True
@@ -486,10 +483,11 @@ def collapse_to_consensus(seqrecords, strict=False, do_iron=True):
                 # (also, skip any left-side inserts)
                 if char not in '-.' and not is_beginning:
                     new_mol_seq.append(char.lower())
-        rec.seq = ''.join(new_mol_seq)
+        molseq = ''.join(new_mol_seq)
         if do_iron:
-            rec.seq = iron(rec.seq)
-        block['sequences'].append(seqrecord2sequence(rec, qlen, index))
+            molseq = iron(molseq)
+        block['sequences'].append(seqrecord2sequence(rec, qlen, index,
+                                                     molseq=molseq))
 
     return block
 
