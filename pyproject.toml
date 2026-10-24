@@ -1,3 +1,43 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "biocma"
+dynamic = ["version"]
+description = "I/O and utilities for the Consensus Multiple Alignment (CMA) file format."
+readme = "README.rst"
+requires-python = ">=3.12"
+license = "BSD-2-Clause"
+license-files = ["LICENSE"]
+authors = [
+    {name = "Eric Talevich", email = "me+code@etal.mozmail.com"},
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+dependencies = [
+    "biopython>=1.86",
+]
+
+[project.urls]
+homepage = "https://github.com/etal/biocma"
+repository = "https://github.com/etal/biocma"
+
+[tool.setuptools]
+packages = ["biocma"]
+
+[tool.setuptools.dynamic]
+version = {attr = "biocma.__version__"}
+
 [tool.pytest.ini_options]
 minversion = "7.0"
 testpaths = ["test"]
