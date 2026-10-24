@@ -9,6 +9,8 @@ import re
 
 from . import sugar
 
+logger = logging.getLogger(__name__)
+
 
 def parse(infile):
     with sugar.maybe_open(infile) as instream:
@@ -57,8 +59,8 @@ def _parse_blocks(instream):
             sequences = list(_parse_sequences(ilines, qlen))
             # Validation
             if not len(sequences) == seqcount:
-                logging.warning("Expected %d sequences in block %s, found %d",
-                                seqcount, name, len(sequences))
+                logger.warning("Expected %d sequences in block %s, found %d",
+                               seqcount, name, len(sequences))
             yield {'level': level,
                    'one': one,
                    'name': name,
@@ -89,20 +91,20 @@ def _parse_sequences(ilines, expect_qlen):
         try:
             index, this_len, query_len = _parse_seq_preheader(first)
         except ValueError:
-            logging.warning('Unparseable line (SKIPPING):\n%s', first)
+            logger.warning('Unparseable line (SKIPPING):\n%s', first)
             continue
         (rec_id, dbxrefs, headlen, taillen, phylum, taxchar, description
                 ) = _parse_seq_header(next(ilines))
         try:
             headseq, molseq, tailseq = _parse_seq_body(next(ilines))
         except ValueError:
-            logging.warning('Unparseable sequence: %s -- SKIPPING', rec_id)
+            logger.warning('Unparseable sequence: %s -- SKIPPING', rec_id)
             continue
 
         # Validation
         if expect_qlen != query_len:
-            logging.warning("Query length in %s given as %d; expected %d",
-                            rec_id, query_len, expect_qlen)
+            logger.warning("Query length in %s given as %d; expected %d",
+                           rec_id, query_len, expect_qlen)
         if not headseq and not headlen:
             headlen = 0
         if not tailseq and not taillen:
@@ -111,14 +113,14 @@ def _parse_sequences(ilines, expect_qlen):
             if headlen is None:
                 headlen = len(headseq)
             elif headlen != len(headseq):
-                logging.warning("Conflicting head flank lengths in %s: %d, %d",
-                                rec_id, headlen, len(headseq))
+                logger.warning("Conflicting head flank lengths in %s: %d, %d",
+                               rec_id, headlen, len(headseq))
         if tailseq:
             if taillen is None:
                 taillen = len(tailseq)
             elif taillen != len(tailseq):
-                logging.warning("Conflicting tail flank lengths in %s: %d, %d",
-                                rec_id, taillen, len(tailseq))
+                logger.warning("Conflicting tail flank lengths in %s: %d, %d",
+                               rec_id, taillen, len(tailseq))
 
         yield {'index': index,
                'id': rec_id,
@@ -156,8 +158,8 @@ def _parse_block_postheader(line):
     parts = line[1:].split(')', 1)
     qlen = int(parts[0])
     if not len(parts[1]) == qlen:
-        logging.warning("postheader expected %d-long query, found %d",
-                        qlen, len(parts[1]))
+        logger.warning("postheader expected %d-long query, found %d",
+                       qlen, len(parts[1]))
     return qlen, parts[1]
 
 
@@ -230,7 +232,7 @@ def _parse_seq_header(line):
             if taxchar is None:
                 taxchar = ''
         else:
-            logging.warning("Couldn't match head/tail: %s", _deets)
+            logger.warning("Couldn't match head/tail: %s", _deets)
     else:
         description = descr
 
@@ -402,7 +404,7 @@ def seqrecord2sequence(record, qlen, index, molseq=None):
 
 def replace_asterisks(seq, label=None):
     if '*' in seq:
-        logging.warning(
+        logger.warning(
             "Sequence %scontains '*' character; replacing with 'X'",
             str(label) + ' ' if label else '')
     return str(seq).replace('*', 'X')
@@ -432,8 +434,8 @@ def collapse_to_consensus(seqrecords, strict=False, do_iron=True):
         if '-' in cons_seq:
             if strict:
                 raise ValueError("Consensus contains '-' gap characters")
-            logging.warning("Consensus sequence contains both '.' and '-' gap "
-                            "characters -- is it really the consensus?")
+            logger.warning("Consensus sequence contains both '.' and '-' gap "
+                           "characters -- is it really the consensus?")
             aligned_cols = [(c not in '.-') for c in cons_seq]
         else:
             aligned_cols = [c != '.' for c in cons_seq]

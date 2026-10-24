@@ -41,6 +41,7 @@ def test_parse_skips_wrapped_sequences(aaaplus_sma, caplog):
     assert skipped == ["RfcE_human", "RfcBCD", "RfcA", "RfcE"]
     assert "Expected 4 sequences in block RfcE, found 3" in messages
     assert "Expected 3 sequences in block MiscRfc, found 0" in messages
+    assert {rec.name for rec in caplog.records} == {"biocma.cma"}
 
 
 def test_parse_header_and_flank_fields(fikk_cma, aaaplus_sma):
