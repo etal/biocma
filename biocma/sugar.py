@@ -1,23 +1,24 @@
 """Helpers."""
 
 import contextlib
+import os
 
 
 def make_reader(parser):
     def read(infile, *args, **kwargs):
-        gen = parser(infile, *args, **kwargs)
-        try:
-            first = next(gen)
-        except StopIteration:
-            raise ValueError("Input file is empty") from None
-        try:
-            next(gen)
-        except StopIteration:
-            return first
-        else:
-            raise ValueError(
-                "Input file contains multiple elements; use parse() instead."
-            )
+        with contextlib.closing(parser(infile, *args, **kwargs)) as gen:
+            try:
+                first = next(gen)
+            except StopIteration:
+                raise ValueError("Input file is empty") from None
+            try:
+                next(gen)
+            except StopIteration:
+                return first
+            else:
+                raise ValueError(
+                    "Input file contains multiple elements; use parse() instead."
+                )
 
     return read
 
@@ -26,19 +27,16 @@ def make_reader(parser):
 def maybe_open(infile, mode="r"):
     """Take a file name or a handle, and return a handle.
 
-    Simplifies creating functions that automagically accept either a file name
-    or an already opened file handle.
+    Simplifies creating functions that accept either a file name or an already
+    opened file handle. A file name is a str, bytes or os.PathLike path, as
+    open() accepts; the file it names is closed on leaving the context, also
+    on an exception. Anything else is taken to be a handle and left open.
     """
-    # ENH: Exception safety?
-    if isinstance(infile, str):
-        handle = open(infile, mode)
-        do_close = True
+    if isinstance(infile, (str, bytes, os.PathLike)):
+        with open(infile, mode) as handle:
+            yield handle
     else:
-        handle = infile
-        do_close = False
-    yield handle
-    if do_close:
-        handle.close()
+        yield infile
 
 
 def unblank(stream):

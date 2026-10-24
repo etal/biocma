@@ -10,6 +10,8 @@ See:
 # ENH: column_annotations, like SeqRecord letter_annotations but for whole
 # column positions -- use for conservation & pattern info
 
+import contextlib
+
 from Bio import AlignIO
 from Bio.Align import MultipleSeqAlignment
 from Bio.Seq import Seq
@@ -19,8 +21,9 @@ from . import cma, sugar
 
 
 def parse(infile):
-    for block in cma.parse(infile):
-        yield ChainMultiAlignment.from_block(block)
+    with contextlib.closing(cma.parse(infile)) as blocks:
+        for block in blocks:
+            yield ChainMultiAlignment.from_block(block)
 
 
 read = sugar.make_reader(parse)

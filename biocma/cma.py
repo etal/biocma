@@ -304,7 +304,7 @@ def _parse_seq_body(line):
 def write(blocks, outfile):
     if isinstance(blocks, dict) and "sequences" in blocks:
         blocks = [blocks]
-    with sugar.maybe_open(outfile, "w+") as outstream:
+    with sugar.maybe_open(outfile, "w") as outstream:
         outstream.writelines(itertools.chain(*map(_format_block, blocks)))
 
 

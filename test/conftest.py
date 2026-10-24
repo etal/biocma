@@ -7,7 +7,6 @@ DATA_DIR = Path(__file__).parent
 
 @pytest.fixture
 def fikk_cma():
-    # str, not Path: sugar.maybe_open treats any non-str argument as a handle
     return str(DATA_DIR / "fikk.cma")
 
 

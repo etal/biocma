@@ -1,8 +1,10 @@
 """Tests for parsing and writing the CMA format (biocma.cma)."""
 
 import copy
+import gc
 import io
 import logging
+from pathlib import Path
 
 import pytest
 
@@ -28,6 +30,25 @@ def test_read(fikk_cma):
     block = cma.read(fikk_cma)
     assert len(block["sequences"]) == 24
     assert block["query_length"] == block["sequences"][0]["length"] == 255
+
+
+def test_read_accepts_path_objects(fikk_cma):
+    assert cma.read(Path(fikk_cma)) == cma.read(fikk_cma)
+
+
+# An unclosed file is reported as a ResourceWarning when it is collected, and
+# the test configuration turns that warning into an error.
+def test_read_closes_file_of_several_blocks(aaaplus_sma):
+    with pytest.raises(ValueError, match="multiple elements"):
+        cma.read(aaaplus_sma)
+    gc.collect()
+
+
+def test_parse_closes_file_when_stopped_early(aaaplus_sma):
+    blocks = cma.parse(aaaplus_sma)
+    next(blocks)
+    blocks.close()
+    gc.collect()
 
 
 def test_parse_skips_wrapped_sequences(aaaplus_sma, caplog):
