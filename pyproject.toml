@@ -32,6 +32,12 @@ dependencies = [
 homepage = "https://github.com/etal/biocma"
 repository = "https://github.com/etal/biocma"
 
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "ruff>=0.17.2",
+]
+
 [tool.setuptools]
 packages = ["biocma"]
 
@@ -39,7 +45,7 @@ packages = ["biocma"]
 version = {attr = "biocma.__version__"}
 
 [tool.pytest.ini_options]
-minversion = "7.0"
+minversion = "9.0.2"
 testpaths = ["test"]
 pythonpath = ["."]
 filterwarnings = ["error"]
