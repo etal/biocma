@@ -159,7 +159,7 @@ def tweak_main(argv=None):
         help="'Iron out' indels to remove deletion/insertion transitions.",
     )
     parser.add_argument("-l", "--level", type=int, help="Set the block level.")
-    parser.add_argument("--name", help="Set the block name.")
+    parser.add_argument("--name", type=_block_name, help="Set the block name.")
     parser.add_argument(
         "-o",
         "--output",
@@ -174,6 +174,19 @@ def tweak_main(argv=None):
     except OSError as exc:
         return _fail(parser.prog, exc)
     return 0
+
+
+def _block_name(value):
+    """Accept a block name that MAPGAPS and cma.parse can read back.
+
+    MAPGAPS reads the name as the characters up to the first '(', and a line
+    break would split the block header line.
+    """
+    if not value or any(c in value for c in "(\r\n"):
+        raise argparse.ArgumentTypeError(
+            "must be nonempty and contain no '(' or line break"
+        )
+    return value
 
 
 def _tweak_block(block, args):

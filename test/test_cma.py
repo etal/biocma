@@ -200,11 +200,12 @@ def test_round_trip_preserves_every_field(fixture, request):
         )
 
 
-def test_round_trip_synthetic_block():
+@pytest.mark.parametrize("level", [2, 10, -1])
+def test_round_trip_synthetic_block(level):
     # Header values that neither fixture varies: level, the "one" field and a
     # query_chars line that is not all '*'
     block = {
-        "level": 2,
+        "level": level,
         "one": 3,
         "name": "synth",
         "params": "go=19,gx=2,pn=5.0,lf=0,rf=0",

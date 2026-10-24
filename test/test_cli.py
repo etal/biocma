@@ -150,8 +150,8 @@ def test_dedupe_reports_write_error(fikk_cma, monkeypatch, capsys):
 
 def test_tweak_sets_level_and_name(fikk_cma, tmp_path):
     raised = str(tmp_path / "raised.cma")
-    assert cli.tweak_main([fikk_cma, "--level", "2", "-o", raised]) == 0
-    assert cma.read(raised)["level"] == 2
+    assert cli.tweak_main([fikk_cma, "--level", "10", "-o", raised]) == 0
+    assert cma.read(raised)["level"] == 10
     # Level 0 must also be settable, to reset a non-zero level.
     reset = str(tmp_path / "reset.cma")
     assert (
@@ -159,6 +159,14 @@ def test_tweak_sets_level_and_name(fikk_cma, tmp_path):
     )
     block = cma.read(reset)
     assert (block["level"], block["name"]) == (0, "Testfam")
+
+
+@pytest.mark.parametrize("name", ["Foo(1)", "two\nlines", ""])
+def test_tweak_rejects_unreadable_name(name, fikk_cma, capsys):
+    with pytest.raises(SystemExit) as exc:
+        cli.tweak_main([fikk_cma, "--name", name])
+    assert exc.value.code == 2
+    assert "--name" in capsys.readouterr().err
 
 
 def test_tweak_adds_consensus(fikk_cma, capsys):

@@ -193,9 +193,12 @@ def _next_line(ilines, expected):
 def _parse_block_header(line):
     """
     [0_(1)=fa2cma(8){go=10000,gx=2000,pn=1000.0,lf=0,rf=0}:
+
+    The level is a signed integer of any length. The name ends at the first
+    '(', as in MAPGAPS, which reads it with the scanf conversion %[^(].
     """
-    level = line[1]
-    one, _rest = line[4:].split(")=", 1)
+    level, _rest = line[1:].split("_", 1)
+    one, _rest = _rest[1:].split(")=", 1)
     name, _rest = _rest.split("(", 1)
     seqcount, _rest = _rest.split(")", 1)
     params = _rest.strip("{}:")
