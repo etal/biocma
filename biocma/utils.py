@@ -1,8 +1,3 @@
-import logging
-
-# from .cma import parse, 
-
-
 def find_seq_rec(block, name, case_sensitive=True):
     """Given part of a sequence ID, find the first matching record."""
     if case_sensitive:
@@ -28,7 +23,6 @@ def find_seq_id(block, name, case_sensitive=True):
 
     Raise a ValueError if no matching key is found.
     """
-    # logging.warn("DEPRECATED: Try to use cma.find_seq_rec instead")
     rec = find_seq_rec(block, name, case_sensitive)
     return rec['id']
 
@@ -200,15 +194,8 @@ def get_inserts(block):
                 for record in block['sequences'])
 
 
-def number_letters(block_or_record, key=None):
+def number_letters(record):
     """Return a dict of {posn: restype} for each letter in the sequence."""
-    if key:
-        logging.warning("DEPRECATED: Pass a record instead")
-        assert 'sequences' in block_or_record, "Expected a block and a key"
-        record = find_seq_rec(block_or_record, key)
-    else:
-        assert 'id' in block_or_record, "Expected argument to be a record"
-        record = block_or_record
     # Ungapped sequence -- accounts for dels vs. consensus
     seq = record['seq'].replace('-', '').replace('.', '')
     # Difference between string positions and residue numbers

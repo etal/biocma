@@ -15,7 +15,7 @@ def make_reader(parser):
         except StopIteration:
             return first
         else:
-            raise ValueError("Input file contains multiple elements;"
+            raise ValueError("Input file contains multiple elements; "
                     "use parse() instead.")
     return read
 

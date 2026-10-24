@@ -47,7 +47,6 @@ class ChainMultiAlignment(MultipleSeqAlignment):
 
     def __init__(self, records,
             # CMA-specific attributes here
-            # one=1,
             level=0,
             name=None,
             params=None,
@@ -63,7 +62,7 @@ class ChainMultiAlignment(MultipleSeqAlignment):
 
     @classmethod
     def from_block(cls, block):
-        """Instantiate this class given a raw block (see parse_raw)."""
+        """Instantiate this class given a raw block from cma.parse."""
         rseqs = cma.realign_seqs(block)
         records = (SeqRecord(Seq(rseq),
                     id=bseq['id'],
@@ -80,15 +79,13 @@ class ChainMultiAlignment(MultipleSeqAlignment):
                         head_seq=bseq['head_seq'],
                         tail_seq=bseq['tail_seq'],
                         head_len=bseq['head_len'],
-                        tail_len=bseq['tail_len'],      # dict
+                        tail_len=bseq['tail_len'],
                         ),
                     # ENH: annotate with conservation levels
-                    # letter_annotations=bseq['x'],
                     )
                 for bseq, rseq in zip(block['sequences'], rseqs))
         return cls(records,
                 # CMA attributes
-                # block['one'],
                 block['level'],
                 block['name'],
                 block['params'],

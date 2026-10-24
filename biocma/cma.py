@@ -17,9 +17,6 @@ def parse(infile):
 
 read = sugar.make_reader(parse)
 
-# Removed
-# parse_raw = parse
-
 # --------------------------------------------------------------------
 # Parse the cma into raw chunks
 
@@ -65,7 +62,6 @@ def _parse_blocks(instream):
             yield {'level': level,
                    'one': one,
                    'name': name,
-                   # 'seqcount': seqcount,
                    'params': params,
                    'query_length': qlen,
                    'query_chars': qchars,
@@ -150,14 +146,6 @@ def _parse_block_header(line):
     name, _rest = _rest.split('(', 1)
     seqcount, _rest = _rest.split(')', 1)
     params = _rest.strip('{}:')
-    # try:
-    #     params = dict((key, float(val))
-    #             for key, val in (pair.split('=')
-    #                 for pair in _rest[1:-2].split(',')))
-    # except ValueError:
-    #     # Couldn't convert params to key-val pairs, for whatever reason
-    #     logging.warn("Failed to parse CMA params: %s", _rest[1:-2])
-    #     params = {}
     return int(level), int(one), name, int(seqcount), params
 
 
@@ -199,8 +187,6 @@ def _parse_seq_header(line):
     >gi|3212262|pdb|1A2K|C  {<Chordata(M)>}Chain C, Gdpran-Ntf2 Complex >gi|3212263|pdb|1A2K|D Chain D, Gdpran-Ntf2 Complex >gi|3212264|pdb|1A2K|E Chain E, Gdpran-Ntf2 Complex >gi|5542273|pdb|1IBR|A C
 
     """
-    # ENH: use the two functions in esbglib.parseutils
-    # or, move one or both of those functions into here
     _parts = line[1:].split(None, 1)
     rec_id = _parts[0]
     descr = _parts[1] if _parts[1:] else ''
@@ -304,8 +290,6 @@ def _format_block(block):
 
 """.format(
         seqcount=len(block['sequences']),
-        # fixed_params=','.join('{0}={1}'.format(key, val)
-        #                       for key, val in block['params'].iteritems()),
         **block)
     # Sequences
     for s in _format_sequences(block['sequences'], block['query_length']):
@@ -369,7 +353,7 @@ def realign_seqs(block, gap_char='.', align_indels=False):
 
 
 def consensus2block(record, level=0, name=None, molseq=None):
-    """Convert a Biopython SeqRecord to a esbglib.cma block.
+    """Convert a Biopython SeqRecord to a cma block.
 
     Ungapping is handled here.
 
@@ -380,7 +364,7 @@ def consensus2block(record, level=0, name=None, molseq=None):
         molseq = str(record.seq)
     cons_ungap = molseq.replace('-', '').replace('.', '').upper()
     return dict(
-            level=level, #record.annotations.get('level', 0),
+            level=level,
             one=1,
             name=name or record.id,
             params='go=10000,gx=2000,pn=1000.0,lf=0,rf=0',
@@ -392,7 +376,7 @@ def consensus2block(record, level=0, name=None, molseq=None):
 
 
 def seqrecord2sequence(record, qlen, index, molseq=None):
-    """Convert a Biopython SeqRecord to a esbglib.cma block.
+    """Convert a Biopython SeqRecord to a cma sequence record.
 
     Indels (gaps, casing) must have already been handled in the record or, if
     given, in `molseq`, a string used in place of the record's own sequence.
@@ -437,11 +421,11 @@ def collapse_to_consensus(seqrecords, strict=False, do_iron=True):
     consensus, *rows = seqrecords
     cons_seq = str(consensus.seq)
     cons_length = len(cons_seq)
-    for i, s in enumerate(rows):
+    for index, s in enumerate(rows, 2):
         if len(s) != cons_length:
             raise ValueError(
-            "Sequence #%d has length %d, consensus is %d"
-            % (i+2, len(s), cons_length))
+                "Sequence #%d has length %d, consensus is %d"
+                % (index, len(s), cons_length))
 
     if '.' in cons_seq:
         # Strict -- error if there's a '-'
@@ -588,7 +572,6 @@ def iron(sequence):
         if seen_gaps:
             outchars.append('-' * seen_gaps)
         sequence = ''.join(outchars)
-        # logging.info(sequence)
         assert (sequence.replace('-', '').upper()
                 ==
                 orig_sequence.replace('-', '').upper()), \
