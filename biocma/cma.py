@@ -13,6 +13,12 @@ logger = logging.getLogger(__name__)
 
 
 def parse(infile):
+    """Parse each block of a CMA file, given as a path or an open handle.
+
+    Raise ValueError, naming the block, if the input ends inside a block or a
+    block's structure is malformed. Unparseable sequence lines are skipped
+    with a warning.
+    """
     with sugar.maybe_open(infile) as instream:
         yield from _parse_blocks(instream)
 
@@ -54,10 +60,18 @@ def _parse_blocks(instream):
     for line in ilines:
         if line.startswith("["):
             # Start of block
-            level, one, name, seqcount, params = _parse_block_header(line)
-            qlen, qchars = _parse_block_postheader(next(ilines))
-            # Pass control to the sequence parser
-            sequences = list(_parse_sequences(ilines, qlen))
+            try:
+                level, one, name, seqcount, params = _parse_block_header(line)
+                qlen, qchars = _parse_block_postheader(
+                    _next_line(ilines, "the query line")
+                )
+                # Pass control to the sequence parser
+                sequences = list(_parse_sequences(ilines, qlen))
+            except UnicodeDecodeError:
+                # An encoding error, not a malformed block
+                raise
+            except (IndexError, ValueError) as exc:
+                raise ValueError(f"Malformed CMA block {line!r}: {exc}") from exc
             # Validation
             if not len(sequences) == seqcount:
                 logger.warning(
@@ -88,7 +102,7 @@ def _parse_sequences(ilines, expect_qlen):
 
     """  # noqa: E501
     while True:
-        first = next(ilines)
+        first = _next_line(ilines, "a sequence or the end of the block")
         if first.startswith("_") and first.endswith("]."):
             # End of sequences & end of block
             break
@@ -100,11 +114,12 @@ def _parse_sequences(ilines, expect_qlen):
             logger.warning("Unparseable line (SKIPPING):\n%s", first)
             continue
         (rec_id, dbxrefs, headlen, taillen, phylum, taxchar, description) = (
-            _parse_seq_header(next(ilines))
+            _parse_seq_header(_next_line(ilines, f"the header line after {first}"))
         )
+        body = _next_line(ilines, f"the sequence line of {rec_id}")
         try:
-            headseq, molseq, tailseq = _parse_seq_body(next(ilines))
-        except ValueError:
+            headseq, molseq, tailseq = _parse_seq_body(body)
+        except (IndexError, ValueError):
             logger.warning("Unparseable sequence: %s -- SKIPPING", rec_id)
             continue
 
@@ -155,6 +170,21 @@ def _parse_sequences(ilines, expect_qlen):
             "length": this_len,
             "seq": molseq,
         }
+
+
+def _next_line(ilines, expected):
+    """Return the next line of the current block.
+
+    Raise ValueError naming what was expected if the input ends, or if the
+    line is the header of another block.
+    """
+    try:
+        line = next(ilines)
+    except StopIteration:
+        raise ValueError(f"the input ends where {expected} was expected") from None
+    if line.startswith("["):
+        raise ValueError(f"the block does not end before the next block {line!r}")
+    return line
 
 
 # Microparsing

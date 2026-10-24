@@ -51,6 +51,73 @@ def test_parse_closes_file_when_stopped_early(aaaplus_sma):
     gc.collect()
 
 
+def truncation_offsets():
+    """Offsets that cut test/fikk.cma inside each kind of line."""
+    # Read here rather than through a fixture, since parametrize needs them
+    text = (Path(__file__).parent / "fikk.cma").read_text()
+    preheader = text.index("\n$2=") + 1
+    return {
+        "block header": 20,
+        "query line": text.index("\n(") + 10,
+        "after preheader": text.index("\n", preheader) + 1,
+        "sequence line": text.index("{()", preheader) + 20,
+        "before terminator": text.index("_0]."),
+    }
+
+
+TRUNCATION_OFFSETS = truncation_offsets()
+
+
+@pytest.mark.parametrize(
+    "offset", TRUNCATION_OFFSETS.values(), ids=TRUNCATION_OFFSETS.keys()
+)
+def test_parse_rejects_truncated_input(offset, fikk_cma, tmp_path):
+    with open(fikk_cma) as handle:
+        text = handle.read()
+    truncated = tmp_path / "truncated.cma"
+    truncated.write_text(text[:offset])
+    with pytest.raises(ValueError, match=r"^Malformed CMA block '\[0_\(1\)=FIKK"):
+        cma.read(truncated)
+    gc.collect()
+
+
+@pytest.mark.parametrize("kept", [1, 2, 3])
+def test_parse_rejects_block_without_terminator(kept, fikk_cma):
+    with open(fikk_cma) as handle:
+        text = handle.read()
+    # The block cut after the first 1, 2 or 3 lines of its second sequence,
+    # then a whole block, whose header comes where the first block expects a
+    # sequence's header line, its sequence line, or the next sequence
+    offset = text.index("\n$2=") + 1
+    for _ in range(kept):
+        offset = text.index("\n", offset) + 1
+    with pytest.raises(ValueError, match="does not end before the next block"):
+        list(cma.parse(io.StringIO(text[:offset] + text)))
+
+
+def test_parse_passes_encoding_errors_through(fikk_cma):
+    with open(fikk_cma, "rb") as handle:
+        data = handle.read()
+    # A byte that is not valid UTF-8, inside a sequence ID past the first
+    # 8192-byte chunk that TextIOWrapper decodes, so the error arises while a
+    # block is being parsed
+    offset = data.index(b"\n>", 8192) + 3
+    data = data[:offset] + b"\xfc" + data[offset + 1 :]
+    with pytest.raises(UnicodeDecodeError):
+        cma.read(io.TextIOWrapper(io.BytesIO(data), encoding="utf-8"))
+
+
+def test_parse_skips_sequence_line_without_braces(fikk_cma, caplog):
+    with open(fikk_cma) as handle:
+        lines = handle.read().splitlines(keepends=True)
+    bodies = [i for i, line in enumerate(lines) if line.startswith("{()")]
+    lines[bodies[1]] = "NOBRACES\n"
+    with caplog.at_level(logging.WARNING):
+        block = cma.read(io.StringIO("".join(lines)))
+    assert len(block["sequences"]) == 23
+    assert "Unparseable sequence" in caplog.text
+
+
 def test_parse_skips_wrapped_sequences(aaaplus_sma, caplog):
     with caplog.at_level(logging.WARNING):
         blocks = list(cma.parse(aaaplus_sma))
