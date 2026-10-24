@@ -27,6 +27,13 @@ def _fail(prog, exc):
     return 1
 
 
+def _add_infile(parser, what='CMA file'):
+    """Add the optional input file argument that every command takes."""
+    parser.add_argument(
+        'infile', nargs='?', default='-',
+        help=f"{what} to read, or '-' for standard input (the default).")
+
+
 def blocks_main(argv=None):
     """cma-blocks: write the aligned columns of a CMA file as FASTA."""
     parser = argparse.ArgumentParser(
@@ -35,9 +42,7 @@ def blocks_main(argv=None):
         "write the remaining aligned columns to standard output as a FASTA "
         "alignment. The sequences of all blocks in the file are written in "
         "order as one FASTA stream.")
-    parser.add_argument(
-        'infile', nargs='?', default='-',
-        help="CMA file to read (default: standard input).")
+    _add_infile(parser)
     args = parser.parse_args(argv)
 
     try:
@@ -71,9 +76,7 @@ def convert_main(argv=None):
     direction.add_argument(
         '-i', '--informat', metavar='FORMAT',
         help="Convert FORMAT input to CMA.")
-    parser.add_argument(
-        'infile', nargs='?', default='-',
-        help="Alignment file to read (default: standard input).")
+    _add_infile(parser, 'Alignment file')
     args = parser.parse_args(argv)
 
     if args.outformat is not None:
@@ -96,9 +99,7 @@ def dedupe_main(argv=None):
         "each ID the record with the most aligned (uppercase) residues is "
         "kept, and of equally good records the last one. The number of "
         "records removed is reported on standard error.")
-    parser.add_argument(
-        'infile', nargs='?', default='-',
-        help="CMA file to read (default: standard input).")
+    _add_infile(parser)
     args = parser.parse_args(argv)
 
     blocks = []
@@ -108,15 +109,19 @@ def dedupe_main(argv=None):
             kept = _best_by_id(block['sequences'])
             dropped += len(block['sequences']) - len(kept)
             blocks.append(dict(block, sequences=kept))
+        print(f"Dropped {dropped} duplicate sequences", file=sys.stderr)
+        cma.write(blocks, sys.stdout)
     except OSError as exc:
         return _fail(parser.prog, exc)
-    print(f"Dropped {dropped} duplicate sequences", file=sys.stderr)
-    cma.write(blocks, sys.stdout)
     return 0
 
 
 def _best_by_id(sequences):
-    """Keep, in order, the best record for each ID, as cma-dedupe describes."""
+    """Keep the best record for each sequence ID, in their original order.
+
+    The best record has the most uppercase (aligned) residues; of equally good
+    records, the last is kept.
+    """
     best = {}
     for idx, seq in enumerate(sequences):
         score = sum(c.isupper() for c in seq['seq'])
@@ -130,11 +135,11 @@ def tweak_main(argv=None):
     """cma-tweak: change block-level features of a CMA file."""
     parser = argparse.ArgumentParser(
         prog='cma-tweak',
-        description="Change CMA-specific features of each block in a CMA "
-        "file, for example: cma-tweak foo.cma --iron --level 1 --name Testfam")
-    parser.add_argument(
-        'infile', nargs='?', default='-',
-        help="CMA file to read (default: standard input).")
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description="Change CMA-specific features of each block in a CMA file.",
+        epilog="example:\n"
+        "  cma-tweak foo.cma --iron --level 1 --name Testfam -o bar.cma")
+    _add_infile(parser)
     parser.add_argument(
         '-c', '--add-consensus', action='store_true',
         help="Insert a consensus sequence as the first record.")
@@ -149,7 +154,7 @@ def tweak_main(argv=None):
         help="Set the block name.")
     parser.add_argument(
         '-o', '--output', default='-',
-        help="CMA file to write (default: standard output).")
+        help="CMA file to write, or '-' for standard output (the default).")
     args = parser.parse_args(argv)
 
     try:
@@ -162,6 +167,7 @@ def tweak_main(argv=None):
 
 
 def _tweak_block(block, args):
+    """Apply the cma-tweak options in args to block in place and return it."""
     if args.add_consensus:
         block['sequences'].insert(0, utils.get_consensus(block))
     if args.level is not None:
