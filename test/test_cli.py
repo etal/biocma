@@ -82,9 +82,13 @@ def test_closed_pipe_exits_quietly(
     assert err in ("", "Dropped 0 duplicate sequences\n")
 
 
-def test_closed_pipe_in_a_real_process(fikk_cma):
+def test_closed_pipe_in_a_real_process(fikk_cma, monkeypatch):
     # Standard output is a pipe whose read end is already closed, so the first
-    # write fails; the process exits with status 1 and prints nothing.
+    # write fails; the process exits with status 1 and prints nothing. Output
+    # still buffered must not be flushed again at interpreter exit, which
+    # would print 'Exception ignored ... BrokenPipeError' and exit with status
+    # 120. PYTHONUNBUFFERED would hide that case, so the child runs without it.
+    monkeypatch.delenv("PYTHONUNBUFFERED", raising=False)
     read_end, write_end = os.pipe()
     os.close(read_end)
     script = (
