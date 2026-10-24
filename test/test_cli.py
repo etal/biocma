@@ -13,7 +13,8 @@ def read_fasta(text):
     return [(head[1:], seq) for head, seq in zip(lines[::2], lines[1::2])]
 
 
-@pytest.mark.parametrize('main', [cli.blocks_main, cli.convert_main])
+@pytest.mark.parametrize('main', [cli.blocks_main, cli.convert_main,
+                                  cli.dedupe_main])
 def test_help(main, capsys):
     with pytest.raises(SystemExit) as exc:
         main(['--help'])
@@ -88,3 +89,32 @@ def test_convert_requires_one_direction(options, fikk_cma):
     with pytest.raises(SystemExit) as exc:
         cli.convert_main(options + [fikk_cma])
     assert exc.value.code == 2
+
+
+def test_dedupe_keeps_best_and_last_of_ties(fikk_cma, tmp_path, capsys):
+    block = cma.read(fikk_cma)
+    first, second, third, *rest = block['sequences']
+    worse = dict(second, seq=second['seq'].lower(), description='worse')
+    tie = dict(third, description='tie')
+    block['sequences'] = [first, worse, second, third, tie] + rest
+    infile = str(tmp_path / 'dupes.cma')
+    cma.write(block, infile)
+
+    assert cli.dedupe_main([infile]) == 0
+    out, err = capsys.readouterr()
+    assert err == "Dropped 2 duplicate sequences\n"
+    outfile = tmp_path / 'deduped.cma'
+    outfile.write_text(out)
+    kept = cma.read(str(outfile))['sequences']
+    assert [(seq['id'], seq['description']) for seq in kept[:3]] == [
+        (first['id'], first['description']),
+        (second['id'], second['description']),
+        (third['id'], 'tie')]
+    assert len(kept) == 24
+
+
+def test_dedupe_handles_multiple_blocks(aaaplus_sma, capsys):
+    assert cli.dedupe_main([aaaplus_sma]) == 0
+    out, err = capsys.readouterr()
+    assert err == "Dropped 0 duplicate sequences\n"
+    assert out.count('_0].\n') == 13

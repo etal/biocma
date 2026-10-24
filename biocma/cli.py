@@ -80,3 +80,42 @@ def convert_main(argv=None):
     except (OSError, ValueError) as exc:
         return _fail(parser.prog, exc)
     return 0
+
+
+def dedupe_main(argv=None):
+    """cma-dedupe: keep one record for each sequence ID in a CMA file."""
+    parser = argparse.ArgumentParser(
+        prog='cma-dedupe',
+        description="Remove records with duplicate sequence IDs from each "
+        "block of a CMA file and write the result to standard output. For "
+        "each ID the record with the most aligned (uppercase) residues is "
+        "kept, and of equally good records the last one. The number of "
+        "records removed is reported on standard error.")
+    parser.add_argument(
+        'infile', nargs='?', default='-',
+        help="CMA file to read (default: standard input).")
+    args = parser.parse_args(argv)
+
+    blocks = []
+    dropped = 0
+    try:
+        for block in cma.parse(_input(args.infile)):
+            kept = _best_by_id(block['sequences'])
+            dropped += len(block['sequences']) - len(kept)
+            blocks.append(dict(block, sequences=kept))
+    except OSError as exc:
+        return _fail(parser.prog, exc)
+    print(f"Dropped {dropped} duplicate sequences", file=sys.stderr)
+    cma.write(blocks, sys.stdout)
+    return 0
+
+
+def _best_by_id(sequences):
+    """Keep, in order, the best record for each ID, as cma-dedupe describes."""
+    best = {}
+    for idx, seq in enumerate(sequences):
+        score = sum(c.isupper() for c in seq['seq'])
+        if seq['id'] not in best or score >= best[seq['id']][0]:
+            best[seq['id']] = (score, idx)
+    keep = {idx for _score, idx in best.values()}
+    return [seq for idx, seq in enumerate(sequences) if idx in keep]
