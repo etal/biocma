@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 """Lower-level functionality for parsing CMA (.cma) files.
 
 This handles .chn (CHAIN) files as a collection of CMA blocks, i.e. alignments.
@@ -62,8 +60,8 @@ def _parse_blocks(instream):
             sequences = list(_parse_sequences(ilines, qlen))
             # Validation
             if not len(sequences) == seqcount:
-                logging.warn("Expected %d sequences in block %s, found %d",
-                             seqcount, name, len(sequences))
+                logging.warning("Expected %d sequences in block %s, found %d",
+                                seqcount, name, len(sequences))
             yield {'level': level,
                    'one': one,
                    'name': name,
@@ -95,20 +93,20 @@ def _parse_sequences(ilines, expect_qlen):
         try:
             index, this_len, query_len = _parse_seq_preheader(first)
         except ValueError:
-            logging.warn('Unparseable line (SKIPPING):\n%s', first)
+            logging.warning('Unparseable line (SKIPPING):\n%s', first)
             continue
         (rec_id, dbxrefs, headlen, taillen, phylum, taxchar, description
                 ) = _parse_seq_header(next(ilines))
         try:
             headseq, molseq, tailseq = _parse_seq_body(next(ilines))
         except ValueError:
-            logging.warn('Unparseable sequence: %s -- SKIPPING', rec_id)
+            logging.warning('Unparseable sequence: %s -- SKIPPING', rec_id)
             continue
 
         # Validation
         if expect_qlen != query_len:
-            logging.warn("Query length in %s given as %d; expected %d",
-                         rec_id, query_len, expect_qlen)
+            logging.warning("Query length in %s given as %d; expected %d",
+                            rec_id, query_len, expect_qlen)
         if not headseq and not headlen:
             headlen = 0
         if not tailseq and not taillen:
@@ -117,14 +115,14 @@ def _parse_sequences(ilines, expect_qlen):
             if headlen is None:
                 headlen = len(headseq)
             elif headlen != len(headseq):
-                logging.warn("Conflicting head flank lengths in %s: %d, %d",
-                             rec_id, headlen, len(headseq))
+                logging.warning("Conflicting head flank lengths in %s: %d, %d",
+                                rec_id, headlen, len(headseq))
         if tailseq:
             if taillen is None:
                 taillen = len(tailseq)
             elif taillen != len(tailseq):
-                logging.warn("Conflicting tail flank lengths in %s: %d, %d",
-                             rec_id, taillen, len(tailseq))
+                logging.warning("Conflicting tail flank lengths in %s: %d, %d",
+                                rec_id, taillen, len(tailseq))
 
         yield {'index': index,
                'id': rec_id,
@@ -170,8 +168,8 @@ def _parse_block_postheader(line):
     parts = line[1:].split(')', 1)
     qlen = int(parts[0])
     if not len(parts[1]) == qlen:
-        logging.warn("postheader expected %d-long query, found %d",
-                     qlen, len(parts[1]))
+        logging.warning("postheader expected %d-long query, found %d",
+                        qlen, len(parts[1]))
     return qlen, parts[1]
 
 
@@ -246,7 +244,7 @@ def _parse_seq_header(line):
             if taxchar is None:
                 taxchar = ''
         else:
-            logging.warn("Couldn't match head/tail: %s", _deets)
+            logging.warning("Couldn't match head/tail: %s", _deets)
     else:
         description = descr
 
@@ -418,8 +416,9 @@ def seqrecord2sequence(record, qlen, index):
 
 def replace_asterisks(seq, label=None):
     if '*' in seq:
-        logging.warn("Sequence %scontains '*' character; replacing with 'X'",
-                str(label) + ' ' if label else '')
+        logging.warning(
+            "Sequence %scontains '*' character; replacing with 'X'",
+            str(label) + ' ' if label else '')
     return str(seq).replace('*', 'X')
 
 
@@ -453,8 +452,8 @@ def collapse_to_consensus(seqrecords, strict=False, do_iron=True):
         if '-' in str(consensus.seq):
             if strict:
                 raise ValueError("Consensus contains '-' gap characters")
-            logging.warn("Consensus sequence contains both '.' and '-' gap "
-                         "characters -- is it really the consensus?")
+            logging.warning("Consensus sequence contains both '.' and '-' gap "
+                            "characters -- is it really the consensus?")
             aligned_cols = [(c not in '.-') for c in str(consensus.seq)]
         else:
             aligned_cols = [c != '.' for c in str(consensus.seq)]
@@ -468,7 +467,7 @@ def collapse_to_consensus(seqrecords, strict=False, do_iron=True):
     qlen = block['query_length']
 
     # Collapse & add remaining sequences to the block
-    for index, rec in zip(xrange(2, len(seqrecords)+2), seqrecords):
+    for index, rec in enumerate(seqrecords, 2):
         # Collapse rec.seq down to aligned size
         new_mol_seq = []
         is_beginning = True
@@ -599,34 +598,3 @@ def iron(sequence):
                 '\nOrig: ' + orig_sequence + \
                 '\nIron: ' + sequence
     return sequence
-
-
-# --------------------------------------------------------------------
-
-if __name__ == '__main__':
-    # Test
-    import sys
-    from .utils import get_equivalent_positions
-
-    cmafiles = sys.argv[1:]
-    if not cmafiles:
-        sys.exit("usage: cma.py <cmafile1> [<cmafile2> ...]")
-
-    for fname in cmafiles:
-        block = next(parse(fname))
-        print block['query_length'], "aa query"
-        print len(block['sequences']), "sequences"
-        print "of lengths:",
-        for seq in block['sequences']:
-            print "%d/%d(%d)" % (
-                len(seq['seq']), seq['length'], seq['seq'].count('-')),
-        print
-        print "  Equivalencies:"
-        for idx in xrange(1, 20):
-            print idx, '=', get_equivalent_positions(block)[idx]
-        print
-        print "  Writing the file back out:"
-        print
-        if len(block['sequences']) < 60:
-            write(block, sys.stdout)
-

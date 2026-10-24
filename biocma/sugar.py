@@ -1,19 +1,17 @@
 """Helpers."""
 
 import contextlib
-import itertools
-import logging
 
 
 def make_reader(parser):
     def read(infile, *args, **kwargs):
         gen = parser(infile, *args, **kwargs)
         try:
-            first = gen.next()
+            first = next(gen)
         except StopIteration:
-            raise ValueError("Input file is empty")
+            raise ValueError("Input file is empty") from None
         try:
-            gen.next()
+            next(gen)
         except StopIteration:
             return first
         else:
@@ -30,7 +28,7 @@ def maybe_open(infile, mode='r'):
     or an already opened file handle.
     """
     # ENH: Exception safety?
-    if isinstance(infile, basestring):
+    if isinstance(infile, str):
         handle = open(infile, mode)
         do_close = True
     else:
@@ -43,6 +41,6 @@ def maybe_open(infile, mode='r'):
 
 def unblank(stream):
     """Remove blank lines from a file being read iteratively."""
-    return itertools.ifilter(None, (line.strip() for line in stream))
+    return filter(None, (line.strip() for line in stream))
 
 

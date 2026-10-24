@@ -79,7 +79,7 @@ def get_conservation(block):
                              "consensus (%s)"
                              % (len(row), len(consensus)))
     # transpose & go
-    columns = zip(*cleaned)
+    columns = list(zip(*cleaned))
     return dict((idx + 1, columns[idx].count(cons_char) / height)
                 for idx, cons_char in enumerate(consensus))
 
@@ -127,7 +127,7 @@ def get_equivalent_positions(block):
         #   curr_posn[id] = current equivalent res.num in `id` to cons[i]
         curr_resn[rec['id']] = rec['head_len']
 
-    equivalencies = dict((i+1, {}) for i in xrange(len(consensus)))
+    equivalencies = dict((i+1, {}) for i in range(len(consensus)))
     # Map each character position i in the consensus sequence
     # to equivalent residues in each of the other sequences
     #   i = index in the consensus string (== consensus res.num - 1)
@@ -203,7 +203,7 @@ def get_inserts(block):
 def number_letters(block_or_record, key=None):
     """Return a dict of {posn: restype} for each letter in the sequence."""
     if key:
-        logging.warn("DEPRECATED: Pass a record instead")
+        logging.warning("DEPRECATED: Pass a record instead")
         assert 'sequences' in block_or_record, "Expected a block and a key"
         record = find_seq_rec(block_or_record, key)
     else:
