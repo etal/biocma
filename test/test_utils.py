@@ -2,6 +2,7 @@
 
 import copy
 
+import pytest
 from Bio import SeqIO
 
 from biocma import cma, utils
@@ -71,6 +72,17 @@ def test_get_consensus_skips_inserts_and_marks_gaps():
     # Counting the leading inserts would make column 1 'q'
     cons = utils.get_consensus(make_block("A-", "qC-", "qC-"))
     assert (cons["seq"], cons["length"]) == ("CX", 2)
+
+
+@pytest.mark.parametrize("rows", [("AC", "ACD"), ("AC", "A")], ids=["long", "short"])
+def test_get_consensus_rejects_rows_of_another_length(rows):
+    with pytest.raises(ValueError, match="s1 has [13] aligned characters"):
+        utils.get_consensus(make_block(*rows))
+
+
+def test_get_consensus_rejects_empty_block():
+    with pytest.raises(ValueError, match="no sequences"):
+        utils.get_consensus({"query_length": 2, "sequences": []})
 
 
 def test_get_conservation():

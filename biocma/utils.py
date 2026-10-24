@@ -1,3 +1,6 @@
+from collections import Counter
+
+
 def find_seq_rec(block, name, case_sensitive=True):
     """Given part of a sequence ID, find the first matching record."""
     if case_sensitive:
@@ -30,16 +33,27 @@ def find_seq_id(block, name, case_sensitive=True):
 
 
 def get_consensus(block):
-    """Calculate a simple consensus sequence for the block."""
-    from collections import Counter
+    """Calculate a simple consensus sequence for the block.
 
+    Raise a ValueError if the block has no sequences, or if the number of
+    aligned (non-insert) characters in any sequence differs from the block's
+    query length.
+    """
+    if not block["sequences"]:
+        raise ValueError("Block has no sequences")
     # Take aligned (non-insert) chars from all rows; transpose
-    columns = zip(
-        *[[c for c in row["seq"] if not c.islower()] for row in block["sequences"]]
-    )
+    rows = []
+    for row in block["sequences"]:
+        aligned = [c for c in row["seq"] if not c.islower()]
+        if len(aligned) != block["query_length"]:
+            raise ValueError(
+                f"Sequence {row['id']} has {len(aligned)} aligned characters, "
+                f"query length is {block['query_length']}"
+            )
+        rows.append(aligned)
+    columns = zip(*rows)
     cons_chars = [Counter(col).most_common()[0][0] for col in columns]
     cons_chars = [c if c != "-" else "X" for c in cons_chars]
-    assert len(cons_chars) == block["query_length"]
     cons_sequence = {
         "index": 1,
         "id": "consensus",
