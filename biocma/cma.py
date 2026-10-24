@@ -407,10 +407,13 @@ def realign_seqs(block, gap_char=".", align_indels=False):
     assigned gaps to account for inserts in the other sequences. We need to add
     the gaps back to obtain a normal alignment.
 
-    `return`: a list of realigned sequence strings.
+    `return`: a list of realigned sequence strings, empty for a block without
+    sequences.
     """
     # ENH: align inserts using an external tool (if align_indels)
     all_chars = [list(sq["seq"]) for sq in block["sequences"]]
+    if not all_chars:
+        return []
     # NB: If speed is an issue here, consider Numpy or Cython
     #   main problem: list.insert is O(n) -- would OrderedDict help?
     nrows = len(all_chars)

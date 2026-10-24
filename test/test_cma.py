@@ -263,6 +263,10 @@ def test_write_does_not_modify_blocks(aaaplus_sma):
     assert write_to_str(blocks) == first
 
 
+def test_realign_seqs_of_empty_block():
+    assert cma.realign_seqs({"sequences": []}) == []
+
+
 def test_iron():
     assert cma.iron("AAAAbc--de-f--gAAA") == "AAAABCDEFgAAA"
     seq = (

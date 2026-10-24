@@ -10,7 +10,7 @@ def make_reader(parser):
             try:
                 first = next(gen)
             except StopIteration:
-                raise ValueError("Input file is empty") from None
+                raise ValueError("Input file contains no elements") from None
             try:
                 next(gen)
             except StopIteration:

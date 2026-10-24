@@ -11,6 +11,7 @@ See:
 # column positions -- use for conservation & pattern info
 
 import contextlib
+import logging
 
 from Bio import AlignIO
 from Bio.Align import MultipleSeqAlignment
@@ -19,10 +20,20 @@ from Bio.SeqRecord import SeqRecord
 
 from . import cma, sugar
 
+logger = logging.getLogger(__name__)
+
 
 def parse(infile):
+    """Parse each block of a CMA file as a ChainMultiAlignment.
+
+    A block without sequences is skipped with a warning, since an alignment
+    of no sequences cannot be written in most formats.
+    """
     with contextlib.closing(cma.parse(infile)) as blocks:
         for block in blocks:
+            if not block["sequences"]:
+                logger.warning("Skipping block %s: no sequences", block["name"])
+                continue
             yield ChainMultiAlignment.from_block(block)
 
 

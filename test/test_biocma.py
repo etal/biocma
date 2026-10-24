@@ -1,7 +1,9 @@
 """Tests for the Biopython interface (biocma.biocma)."""
 
 import io
+import logging
 
+import pytest
 from Bio import AlignIO
 from Bio.Align import MultipleSeqAlignment
 from Bio.Seq import Seq
@@ -28,6 +30,23 @@ def test_read(fikk_cma):
     assert aln[0].id == "FIKK"
     assert (aln.level, aln.name, aln.query_length) == (0, "FIKK", 255)
     assert aln[1].dbxrefs == ["MAL7P1.127"]
+
+
+def test_parse_skips_block_without_sequences(aaaplus_sma, caplog):
+    # Block MiscRfc has only wrapped sequence lines, which cma.parse skips
+    with caplog.at_level(logging.WARNING, logger="biocma.biocma"):
+        alignments = list(biocma.parse(aaaplus_sma))
+    assert len(alignments) == len(list(cma.parse(aaaplus_sma))) - 1
+    assert "MiscRfc" not in [aln.name for aln in alignments]
+    assert "Skipping block MiscRfc: no sequences" in caplog.text
+
+
+def test_read_rejects_file_without_sequences(fikk_cma):
+    buf = io.StringIO()
+    cma.write(dict(cma.read(fikk_cma), sequences=[]), buf)
+    buf.seek(0)
+    with pytest.raises(ValueError, match="no elements"):
+        biocma.read(buf)
 
 
 def test_export_to_genbank(fikk_cma):
