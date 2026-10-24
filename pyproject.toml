@@ -32,6 +32,7 @@ dependencies = [
 cma-blocks = "biocma.cli:blocks_main"
 cma-convert = "biocma.cli:convert_main"
 cma-dedupe = "biocma.cli:dedupe_main"
+cma-tweak = "biocma.cli:tweak_main"
 
 [project.urls]
 homepage = "https://github.com/etal/biocma"

@@ -8,12 +8,17 @@ process exit status. A file argument of ``-`` means standard input or output.
 import argparse
 import sys
 
-from . import cma
+from . import cma, utils
 
 
 def _input(path):
     """Return standard input for '-', otherwise the path itself."""
     return sys.stdin if path == '-' else path
+
+
+def _output(path):
+    """Return standard output for '-', otherwise the path itself."""
+    return sys.stdout if path == '-' else path
 
 
 def _fail(prog, exc):
@@ -119,3 +124,51 @@ def _best_by_id(sequences):
             best[seq['id']] = (score, idx)
     keep = {idx for _score, idx in best.values()}
     return [seq for idx, seq in enumerate(sequences) if idx in keep]
+
+
+def tweak_main(argv=None):
+    """cma-tweak: change block-level features of a CMA file."""
+    parser = argparse.ArgumentParser(
+        prog='cma-tweak',
+        description="Change CMA-specific features of each block in a CMA "
+        "file, for example: cma-tweak foo.cma --iron --level 1 --name Testfam")
+    parser.add_argument(
+        'infile', nargs='?', default='-',
+        help="CMA file to read (default: standard input).")
+    parser.add_argument(
+        '-c', '--add-consensus', action='store_true',
+        help="Insert a consensus sequence as the first record.")
+    parser.add_argument(
+        '--iron', action='store_true',
+        help="'Iron out' indels to remove deletion/insertion transitions.")
+    parser.add_argument(
+        '-l', '--level', type=int,
+        help="Set the block level.")
+    parser.add_argument(
+        '--name',
+        help="Set the block name.")
+    parser.add_argument(
+        '-o', '--output', default='-',
+        help="CMA file to write (default: standard output).")
+    args = parser.parse_args(argv)
+
+    try:
+        blocks = [_tweak_block(block, args)
+                  for block in cma.parse(_input(args.infile))]
+        cma.write(blocks, _output(args.output))
+    except OSError as exc:
+        return _fail(parser.prog, exc)
+    return 0
+
+
+def _tweak_block(block, args):
+    if args.add_consensus:
+        block['sequences'].insert(0, utils.get_consensus(block))
+    if args.level is not None:
+        block['level'] = args.level
+    if args.name is not None:
+        block['name'] = args.name
+    if args.iron:
+        for sequence in block['sequences']:
+            sequence['seq'] = cma.iron(sequence['seq'])
+    return block

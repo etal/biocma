@@ -14,7 +14,7 @@ def read_fasta(text):
 
 
 @pytest.mark.parametrize('main', [cli.blocks_main, cli.convert_main,
-                                  cli.dedupe_main])
+                                  cli.dedupe_main, cli.tweak_main])
 def test_help(main, capsys):
     with pytest.raises(SystemExit) as exc:
         main(['--help'])
@@ -118,3 +118,24 @@ def test_dedupe_handles_multiple_blocks(aaaplus_sma, capsys):
     out, err = capsys.readouterr()
     assert err == "Dropped 0 duplicate sequences\n"
     assert out.count('_0].\n') == 13
+
+
+def test_tweak_sets_level_and_name(fikk_cma, tmp_path):
+    raised = str(tmp_path / 'raised.cma')
+    assert cli.tweak_main([fikk_cma, '--level', '2', '-o', raised]) == 0
+    assert cma.read(raised)['level'] == 2
+    # Level 0 must also be settable, to reset a non-zero level.
+    reset = str(tmp_path / 'reset.cma')
+    assert cli.tweak_main(
+        [raised, '--level', '0', '--name', 'Testfam', '-o', reset]) == 0
+    block = cma.read(reset)
+    assert (block['level'], block['name']) == (0, 'Testfam')
+
+
+def test_tweak_adds_consensus_and_irons(fikk_cma, tmp_path):
+    outfile = str(tmp_path / 'tweaked.cma')
+    assert cli.tweak_main([fikk_cma, '-c', '--iron', '-o', outfile]) == 0
+    sequences = cma.read(outfile)['sequences']
+    assert len(sequences) == 25
+    assert sequences[0]['id'] == 'consensus'
+    assert all(cma.iron(seq['seq']) == seq['seq'] for seq in sequences)
