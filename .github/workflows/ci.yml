@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PIXI_VERSION: v0.82.1
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: prefix-dev/setup-pixi@ad1da6449d9e506fd127fd67ab2d054a769f6a94 # v0.11.2
+        with:
+          pixi-version: ${{ env.PIXI_VERSION }}
+          environments: default
+      - run: pixi run lint --output-format=github
+      - run: pixi run fmt --check
+
+  # conda-forge packages from pixi.lock, at the newest and the oldest
+  # supported Python.
+  pixi:
+    name: pixi (${{ matrix.os }}, ${{ matrix.environment }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        environment: [default, py312]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    env:
+      PIXI_ENV: ${{ matrix.environment }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: prefix-dev/setup-pixi@ad1da6449d9e506fd127fd67ab2d054a769f6a94 # v0.11.2
+        with:
+          pixi-version: ${{ env.PIXI_VERSION }}
+          environments: ${{ matrix.environment }}
+      - run: pixi run -e "$PIXI_ENV" test
+      # The tests call the command functions directly; this checks that the
+      # installed console scripts resolve.
+      - name: Console scripts
+        run: |
+          pixi run -e "$PIXI_ENV" cma-blocks --help
+          pixi run -e "$PIXI_ENV" cma-convert --help
+          pixi run -e "$PIXI_ENV" cma-dedupe --help
+          pixi run -e "$PIXI_ENV" cma-tweak --help
+
+  # PyPI packages from uv.lock.
+  uv:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - run: uv run --locked pytest
+
+  # The declared minimum versions of the direct dependencies, on the oldest
+  # supported Python. uv re-resolves instead of using uv.lock.
+  floor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      UV_RESOLUTION: lowest-direct
+      UV_PYTHON: "3.12"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - run: uv run python -c "import Bio; print('Biopython', Bio.__version__)"
+      - run: uv run pytest
