@@ -16,7 +16,7 @@ def write_to_str(blocks):
 
 
 def without_index(blocks):
-    """Copy blocks without the sequence 'index', which cma.write renumbers."""
+    """Copy blocks without sequence 'index', which written files renumber."""
     blocks = copy.deepcopy(blocks)
     for block in blocks:
         for seq in block["sequences"]:
@@ -120,6 +120,16 @@ def test_write_is_idempotent(fixture, request):
     first = write_to_str(list(cma.parse(request.getfixturevalue(fixture))))
     second = write_to_str(list(cma.parse(io.StringIO(first))))
     assert second == first
+
+
+def test_write_does_not_modify_blocks(aaaplus_sma):
+    # Sequence indices in this fixture do not start at 1 in every block, and
+    # the writer renumbers them in its output
+    blocks = list(cma.parse(aaaplus_sma))
+    before = copy.deepcopy(blocks)
+    first = write_to_str(blocks)
+    assert blocks == before
+    assert write_to_str(blocks) == first
 
 
 def test_iron():

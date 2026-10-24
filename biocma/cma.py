@@ -325,13 +325,12 @@ def _format_sequences(sequences, query_length):
                     if seq['phylum'] and seq['taxchar'] else "")
         special_header = ("{{{0}{1}}}".format(head_tail, taxonomy)
                     if head_tail or taxonomy else "")
-        seq['index'] = idx + 1
         yield """\
 ${index}={length}({0}):
 >{id} {1}{description}
 {head_seq}{{(){seq}()}}{tail_seq}*
 
-""".format(query_length, special_header, **seq)
+""".format(query_length, special_header, **dict(seq, index=idx + 1))
 
 
 # --------------------------------------------------------------------
