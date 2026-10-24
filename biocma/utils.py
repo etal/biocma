@@ -15,7 +15,7 @@ def find_seq_rec(block, name, case_sensitive=True):
     for rec in block["sequences"]:
         if test(name, rec):
             return rec
-    raise ValueError("No sequence ID matches %s" % repr(name))
+    raise ValueError(f"No sequence ID matches {name!r}")
 
 
 def find_seq_id(block, name, case_sensitive=True):
@@ -51,7 +51,7 @@ def get_consensus(block):
                 f"query length is {block['query_length']}"
             )
         rows.append(aligned)
-    columns = zip(*rows)
+    columns = zip(*rows, strict=True)
     cons_chars = [Counter(col).most_common()[0][0] for col in columns]
     cons_chars = [c if c != "-" else "X" for c in cons_chars]
     cons_sequence = {
@@ -85,11 +85,11 @@ def get_conservation(block):
     for row in cleaned:
         if len(row) != len(consensus):
             raise ValueError(
-                "Aligned sequence length (%s) doesn't match "
-                "consensus (%s)" % (len(row), len(consensus))
+                f"Aligned sequence length ({len(row)}) doesn't match "
+                f"consensus ({len(consensus)})"
             )
     # transpose & go
-    columns = list(zip(*cleaned))
+    columns = list(zip(*cleaned, strict=True))
     return dict(
         (idx + 1, columns[idx].count(cons_char) / height)
         for idx, cons_char in enumerate(consensus)

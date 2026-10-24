@@ -15,8 +15,7 @@ from Bio.Align import MultipleSeqAlignment
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 
-from . import cma
-from . import sugar
+from . import cma, sugar
 
 
 def parse(infile):
@@ -88,7 +87,7 @@ class ChainMultiAlignment(MultipleSeqAlignment):
                 ),
                 # ENH: annotate with conservation levels
             )
-            for bseq, rseq in zip(block["sequences"], rseqs)
+            for bseq, rseq in zip(block["sequences"], rseqs, strict=True)
         )
         return cls(
             records,

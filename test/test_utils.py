@@ -12,7 +12,7 @@ def make_block(*rows):
     return {
         "query_length": sum(not c.islower() for c in rows[0]),
         "sequences": [
-            {"id": "s%d" % i, "seq": row, "head_len": 0} for i, row in enumerate(rows)
+            {"id": f"s{i}", "seq": row, "head_len": 0} for i, row in enumerate(rows)
         ],
     }
 

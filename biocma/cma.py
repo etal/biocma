@@ -14,8 +14,7 @@ logger = logging.getLogger(__name__)
 
 def parse(infile):
     with sugar.maybe_open(infile) as instream:
-        for block in _parse_blocks(instream):
-            yield block
+        yield from _parse_blocks(instream)
 
 
 read = sugar.make_reader(parse)
@@ -87,7 +86,7 @@ def _parse_sequences(ilines, expect_qlen):
     >gi|15606894|ref|NP_214275.1|  {|2(244)|<Aquificae(B)>}DNA polymerase III gamma subunit [Aquifex aeolicus VF5] >gi|2984127|gb|AAC07663.1| DNA polymerase III gamma subunit [Aquifex aeolicus VF5] >gi|75
     {()YVPFARKYRPKFFREVIGQEAPVRILKNAIKNDRVAHaYLFAGPRGVGKTTIARILAKALNcknpskgepcgecencreiDRGVFPDLIEMDAASNRGIDDVRA-LKEAVNYKPIKG-KYKVYIIDEAHMLTKEAFNALLKTLEEPPPRTVFVLCTTEYDKILPTILSRCQRIIFSKVRKEKVIEYLKKICEKEGIECEEGALEVLAHASEGCMRDAASLLDQASVYGE()}*
 
-    """
+    """  # noqa: E501
     while True:
         first = next(ilines)
         if first.startswith("_") and first.endswith("]."):
@@ -211,7 +210,7 @@ def _parse_seq_header(line):
     >gi|15606894|ref|NP_214275.1|  {|2(244)|<Aquificae(B)>}DNA polymerase III gamma subunit [Aquifex aeolicus VF5] >gi|2984127|gb|AAC07663.1| DNA polymerase III gamma subunit [Aquifex aeolicus VF5] >gi|75
     >gi|3212262|pdb|1A2K|C  {<Chordata(M)>}Chain C, Gdpran-Ntf2 Complex >gi|3212263|pdb|1A2K|D Chain D, Gdpran-Ntf2 Complex >gi|3212264|pdb|1A2K|E Chain E, Gdpran-Ntf2 Complex >gi|5542273|pdb|1IBR|A C
 
-    """
+    """  # noqa: E501
     _parts = line[1:].split(None, 1)
     rec_id = _parts[0]
     descr = _parts[1] if _parts[1:] else ""
@@ -319,16 +318,21 @@ def _format_block(block):
 
 """.format(seqcount=len(block["sequences"]), **block)
     # Sequences
-    for s in _format_sequences(block["sequences"], block["query_length"]):
-        yield s
+    yield from _format_sequences(block["sequences"], block["query_length"])
     # Block close
-    yield "_%s].\n" % block["level"]
+    yield f"_{block['level']}].\n"
 
 
 def _format_sequences(sequences, query_length):
-    # $1=254(255):
-    # >2QG5|A  {|27(6)|}
-    # {()YTLENTIGRGSWGEVKIAVQKGTRIRRAAKKIPKYFV---EDVDRFKQEIEIMKSLDHPNIIRLYETFEDNTDIYLVMELCTGGELFERVVHKRVFRESDAARIMKDVLSAVAYCHKLNVAHRDLKPENFLFltdSPDSPLKLIDFGLAARFkpGKMMRTKVGTPYYVSPQVLEGL-YGPECDEWSAGVMMYVLLCGYPPFSAPTDXEVMLKIREGTFtfpeKDWLNVSPQAESLIRRLLTKSPKQRIT-----SLQALEHEW-()}*
+    """Format each sequence record as CMA text.
+
+    A formatted sequence looks like:
+
+    $1=254(255):
+    >2QG5|A  {|27(6)|}
+    {()YTLENTIGRGSWGEVKIAVQKGTRIRRAAKKIPKYFV---EDVDRFKQEIEIMKSLDHPNIIRLYETFEDNTDIYLVMELCTGGELFERVVHKRVFRESDAARIMKDVLSAVAYCHKLNVAHRDLKPENFLFltdSPDSPLKLIDFGLAARFkpGKMMRTKVGTPYYVSPQVLEGL-YGPECDEWSAGVMMYVLLCGYPPFSAPTDXEVMLKIREGTFtfpeKDWLNVSPQAESLIRRLLTKSPKQRIT-----SLQALEHEW-()}*
+
+    """
     for idx, seq in enumerate(sequences):
         head_tail = (
             "|{head_len}({tail_len})|".format(**seq)
@@ -341,7 +345,7 @@ def _format_sequences(sequences, query_length):
             else ""
         )
         special_header = (
-            "{{{0}{1}}}".format(head_tail, taxonomy) if head_tail or taxonomy else ""
+            "{" + head_tail + taxonomy + "}" if head_tail or taxonomy else ""
         )
         yield """\
 ${index}={length}({0}):
@@ -461,8 +465,7 @@ def collapse_to_consensus(seqrecords, strict=False, do_iron=True):
     for index, s in enumerate(rows, 2):
         if len(s) != cons_length:
             raise ValueError(
-                "Sequence #%d has length %d, consensus is %d"
-                % (index, len(s), cons_length)
+                f"Sequence #{index} has length {len(s)}, consensus is {cons_length}"
             )
 
     if "." in cons_seq:
@@ -495,7 +498,9 @@ def collapse_to_consensus(seqrecords, strict=False, do_iron=True):
         # Collapse rec.seq down to aligned size
         new_mol_seq = []
         is_beginning = True
-        for aligned_col, char in zip(aligned_cols, replace_asterisks(rec.seq, index)):
+        for aligned_col, char in zip(
+            aligned_cols, replace_asterisks(rec.seq, index), strict=True
+        ):
             if aligned_col:
                 is_beginning = False
                 if char in "-.":
@@ -594,8 +599,8 @@ def iron(sequence):
 
             else:
                 assert not inserts and not seen_gaps, (
-                    "Inserts: %s, gaps: %s, seq: %s, in_ins=%s, in_gap=%s"
-                    % (inserts, seen_gaps, sequence, in_insert, in_gap)
+                    f"Inserts: {inserts}, gaps: {seen_gaps}, seq: {sequence}, "
+                    f"in_ins={in_insert}, in_gap={in_gap}"
                 )
                 # Coming from Match state
                 if char.isupper():

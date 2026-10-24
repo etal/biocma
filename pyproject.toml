@@ -55,3 +55,6 @@ minversion = "9.0.2"
 testpaths = ["test"]
 pythonpath = ["."]
 filterwarnings = ["error"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "LOG", "G"]
