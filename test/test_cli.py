@@ -1,8 +1,9 @@
 """Tests for the command-line programs in biocma.cli."""
 
 import pytest
+from Bio import AlignIO
 
-from biocma import cli
+from biocma import cli, cma
 
 
 def read_fasta(text):
@@ -12,7 +13,7 @@ def read_fasta(text):
     return [(head[1:], seq) for head, seq in zip(lines[::2], lines[1::2])]
 
 
-@pytest.mark.parametrize('main', [cli.blocks_main])
+@pytest.mark.parametrize('main', [cli.blocks_main, cli.convert_main])
 def test_help(main, capsys):
     with pytest.raises(SystemExit) as exc:
         main(['--help'])
@@ -59,3 +60,31 @@ def test_blocks_excludes_flanks_across_blocks(aaaplus_sma, capsys):
     rfcb = next(seq for head, seq in records.items()
                 if head.startswith('RfcB_human'))
     assert rfcb.startswith('ELPWVEKYRP')
+
+
+def test_convert_to_and_from_fasta(fikk_cma, tmp_path, capsys):
+    ids = [seq['id'] for seq in cma.read(fikk_cma)['sequences']]
+    assert cli.convert_main(['-o', 'fasta', fikk_cma]) == 0
+    aligned = tmp_path / 'fikk.fasta'
+    aligned.write_text(capsys.readouterr().out)
+    assert [rec.id for rec in AlignIO.read(str(aligned), 'fasta')] == ids
+
+    assert cli.convert_main(['-i', 'fasta', str(aligned)]) == 0
+    converted = tmp_path / 'fikk.cma'
+    converted.write_text(capsys.readouterr().out)
+    assert [seq['id'] for seq in cma.read(str(converted))['sequences']] == ids
+
+
+@pytest.mark.parametrize('option', ['-o', '-i'])
+def test_convert_reports_unknown_format(option, fikk_cma, capsys):
+    assert cli.convert_main([option, 'nosuchformat', fikk_cma]) == 1
+    out, err = capsys.readouterr()
+    assert out == ''
+    assert err == "cma-convert: error: Unknown format 'nosuchformat'\n"
+
+
+@pytest.mark.parametrize('options', [[], ['-o', 'fasta', '-i', 'fasta']])
+def test_convert_requires_one_direction(options, fikk_cma):
+    with pytest.raises(SystemExit) as exc:
+        cli.convert_main(options + [fikk_cma])
+    assert exc.value.code == 2

@@ -46,3 +46,37 @@ def blocks_main(argv=None):
     except OSError as exc:
         return _fail(parser.prog, exc)
     return 0
+
+
+def convert_main(argv=None):
+    """cma-convert: convert between CMA and other alignment formats."""
+    # Imported here so that the other commands do not load Biopython.
+    from . import biocma
+
+    parser = argparse.ArgumentParser(
+        prog='cma-convert',
+        description="Convert a CMA file to another alignment format, or an "
+        "alignment in another format to CMA, and write the result to standard "
+        "output. FORMAT is a Bio.AlignIO format name such as fasta, clustal "
+        "or stockholm.")
+    direction = parser.add_mutually_exclusive_group(required=True)
+    direction.add_argument(
+        '-o', '--outformat', metavar='FORMAT',
+        help="Convert CMA input to FORMAT.")
+    direction.add_argument(
+        '-i', '--informat', metavar='FORMAT',
+        help="Convert FORMAT input to CMA.")
+    parser.add_argument(
+        'infile', nargs='?', default='-',
+        help="Alignment file to read (default: standard input).")
+    args = parser.parse_args(argv)
+
+    if args.outformat is not None:
+        in_fmt, out_fmt = 'cma', args.outformat
+    else:
+        in_fmt, out_fmt = args.informat, 'cma'
+    try:
+        biocma.convert(_input(args.infile), in_fmt, sys.stdout, out_fmt)
+    except (OSError, ValueError) as exc:
+        return _fail(parser.prog, exc)
+    return 0
