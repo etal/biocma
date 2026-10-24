@@ -28,6 +28,9 @@ dependencies = [
     "biopython>=1.86",
 ]
 
+[project.scripts]
+cma-blocks = "biocma.cli:blocks_main"
+
 [project.urls]
 homepage = "https://github.com/etal/biocma"
 repository = "https://github.com/etal/biocma"
