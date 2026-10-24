@@ -1,6 +1,10 @@
 """Tests for the command-line programs in biocma.cli."""
 
+import gc
 import io
+import os
+import subprocess
+import sys
 
 import pytest
 from Bio import AlignIO
@@ -36,6 +40,79 @@ def test_missing_file_is_reported(prog, main, options, tmp_path, capsys):
     assert out == ""
     assert err.startswith(f"{prog}: error: ")
     assert missing in err
+
+
+@pytest.mark.parametrize("prog, main, options", COMMANDS)
+def test_malformed_input_is_reported(prog, main, options, fikk_cma, tmp_path, capsys):
+    with open(fikk_cma) as handle:
+        text = handle.read()
+    truncated = tmp_path / "truncated.cma"
+    truncated.write_text(text[: len(text) // 2])
+    assert main(options + [str(truncated)]) == 1
+    out, err = capsys.readouterr()
+    assert out == ""
+    assert err.startswith(f"{prog}: error: Malformed CMA block ")
+    gc.collect()
+
+
+class ClosedPipe(io.StringIO):
+    """Standard output whose reader has exited, at a write or at the flush."""
+
+    def __init__(self, fails_at):
+        super().__init__()
+        self.fails_at = fails_at
+
+    def write(self, text):
+        if self.fails_at == "write":
+            raise BrokenPipeError(32, "Broken pipe")
+        return super().write(text)
+
+    def flush(self):
+        if self.fails_at == "flush":
+            raise BrokenPipeError(32, "Broken pipe")
+
+
+@pytest.mark.parametrize("fails_at", ["write", "flush"])
+@pytest.mark.parametrize("prog, main, options", COMMANDS)
+def test_closed_pipe_exits_quietly(
+    prog, main, options, fails_at, fikk_cma, monkeypatch, capsys
+):
+    monkeypatch.setattr(sys, "stdout", ClosedPipe(fails_at))
+    assert main(options + [fikk_cma]) == 1
+    err = capsys.readouterr().err
+    # cma-dedupe reports its count before writing
+    assert err in ("", "Dropped 0 duplicate sequences\n")
+
+
+def test_closed_pipe_in_a_real_process(fikk_cma):
+    # Standard output is a pipe whose read end is already closed, so the first
+    # write fails; the process exits with status 1 and prints nothing.
+    read_end, write_end = os.pipe()
+    os.close(read_end)
+    script = (
+        "import sys; from biocma import cli; sys.exit(cli.blocks_main(sys.argv[1:]))"
+    )
+    with os.fdopen(write_end, "wb") as stdout:
+        result = subprocess.run(
+            [sys.executable, "-c", script, fikk_cma],
+            stdout=stdout,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+    assert (result.returncode, result.stderr) == (1, "")
+
+
+def test_tweak_reports_invalid_block(fikk_cma, tmp_path, capsys):
+    block = cma.read(fikk_cma)
+    # One aligned column more than the query length
+    block["sequences"][1]["seq"] += "A"
+    ragged = tmp_path / "ragged.cma"
+    cma.write(block, ragged)
+    assert cli.tweak_main([str(ragged), "-c"]) == 1
+    err = capsys.readouterr().err
+    assert err.startswith("cma-tweak: error: Sequence ")
+    assert err.endswith("query length is 255\n")
+    gc.collect()
 
 
 def test_blocks_writes_aligned_columns(fikk_cma, capsys):

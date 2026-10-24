@@ -32,7 +32,9 @@ Installing the package also installs four commands. Each reads the CMA or
 alignment file it is given, or standard input if none is given or the file is
 named ``-``, and writes its result to standard output; ``cma-tweak`` can
 instead write to the file named by ``--output``. Run a command with ``--help``
-to see its options.
+to see its options. A file that cannot be read, or input that is not valid
+CMA, is reported in one line on standard error, and the command exits with
+status 1.
 
 ``cma-blocks``
     Remove the unaligned insert columns from a CMA file and write the remaining

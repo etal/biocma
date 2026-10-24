@@ -6,6 +6,9 @@ process exit status. A file argument of ``-`` means standard input or output.
 """
 
 import argparse
+import contextlib
+import functools
+import os
 import sys
 
 from . import cma, utils
@@ -21,10 +24,54 @@ def _output(path):
     return sys.stdout if path == "-" else path
 
 
-def _fail(prog, exc):
-    """Report an error on standard error and return a failing exit status."""
-    print(f"{prog}: error: {exc}", file=sys.stderr)
-    return 1
+def _console(main):
+    """Run a command and report its input and output errors in one line.
+
+    The command function NAME_main takes the argument list and the program
+    name, cma-NAME. OSError and ValueError, which include unreadable files,
+    text that is not valid in the locale's encoding and malformed CMA input,
+    are reported on standard error as 'cma-NAME: error: ...' with exit status
+    1. When the reader of standard output exits early, as head does, the
+    command exits with status 1 and prints nothing, following the note on
+    SIGPIPE in the documentation of Python's signal module.
+    """
+    prog = "cma-" + main.__name__.removesuffix("_main")
+
+    @functools.wraps(main)
+    def wrapper(argv=None):
+        try:
+            status = main(argv, prog)
+            # Inside the try, so that a closed pipe is not first found by the
+            # flush at interpreter exit
+            sys.stdout.flush()
+        except BrokenPipeError:
+            _discard_stdout()
+            return 1
+        except (OSError, ValueError) as exc:
+            print(f"{prog}: error: {exc}", file=sys.stderr)
+            return 1
+        return status
+
+    # The wrapper takes only the argument list; without this, introspection
+    # would follow __wrapped__ and report the command function's signature
+    del wrapper.__wrapped__
+    return wrapper
+
+
+def _discard_stdout():
+    """Send standard output to the null device, as the SIGPIPE note advises.
+
+    Output still buffered then cannot raise BrokenPipeError again when the
+    interpreter flushes standard output at exit.
+    """
+    try:
+        stdout = sys.stdout.fileno()
+    except OSError:
+        # A replacement without a file descriptor, as under pytest
+        return
+    devnull = os.open(os.devnull, os.O_WRONLY)
+    os.dup2(devnull, stdout)
+    os.close(devnull)
 
 
 def _add_infile(parser, what="CMA file"):
@@ -37,10 +84,11 @@ def _add_infile(parser, what="CMA file"):
     )
 
 
-def blocks_main(argv=None):
+@_console
+def blocks_main(argv, prog):
     """cma-blocks: write the aligned columns of a CMA file as FASTA."""
     parser = argparse.ArgumentParser(
-        prog="cma-blocks",
+        prog=prog,
         description="Remove the unaligned insert columns from a CMA file and "
         "write the remaining aligned columns to standard output as a FASTA "
         "alignment. The sequences of all blocks in the file are written in "
@@ -49,26 +97,25 @@ def blocks_main(argv=None):
     _add_infile(parser)
     args = parser.parse_args(argv)
 
-    try:
-        for block in cma.parse(_input(args.infile)):
+    with contextlib.closing(cma.parse(_input(args.infile))) as blocks:
+        for block in blocks:
             for seq in block["sequences"]:
                 header = seq["id"]
                 if seq["description"]:
                     header += " " + seq["description"]
                 aligned = "".join(c for c in seq["seq"] if not c.islower())
                 sys.stdout.write(f">{header}\n{aligned}\n")
-    except OSError as exc:
-        return _fail(parser.prog, exc)
     return 0
 
 
-def convert_main(argv=None):
+@_console
+def convert_main(argv, prog):
     """cma-convert: convert between CMA and other alignment formats."""
     # Imported here so that the other commands do not load Biopython.
     from . import biocma
 
     parser = argparse.ArgumentParser(
-        prog="cma-convert",
+        prog=prog,
         description="Convert a CMA file to another alignment format, or an "
         "alignment in another format to CMA, and write the result to standard "
         "output. FORMAT is a Bio.AlignIO format name such as fasta, clustal "
@@ -88,17 +135,15 @@ def convert_main(argv=None):
         in_fmt, out_fmt = "cma", args.outformat
     else:
         in_fmt, out_fmt = args.informat, "cma"
-    try:
-        biocma.convert(_input(args.infile), in_fmt, sys.stdout, out_fmt)
-    except (OSError, ValueError) as exc:
-        return _fail(parser.prog, exc)
+    biocma.convert(_input(args.infile), in_fmt, sys.stdout, out_fmt)
     return 0
 
 
-def dedupe_main(argv=None):
+@_console
+def dedupe_main(argv, prog):
     """cma-dedupe: keep one record for each sequence ID in a CMA file."""
     parser = argparse.ArgumentParser(
-        prog="cma-dedupe",
+        prog=prog,
         description="Remove records with duplicate sequence IDs from each "
         "block of a CMA file and write the result to standard output. For "
         "each ID the record with the most aligned (uppercase) residues is "
@@ -110,15 +155,13 @@ def dedupe_main(argv=None):
 
     blocks = []
     dropped = 0
-    try:
-        for block in cma.parse(_input(args.infile)):
+    with contextlib.closing(cma.parse(_input(args.infile))) as parsed:
+        for block in parsed:
             kept = _best_by_id(block["sequences"])
             dropped += len(block["sequences"]) - len(kept)
             blocks.append(dict(block, sequences=kept))
-        print(f"Dropped {dropped} duplicate sequences", file=sys.stderr)
-        cma.write(blocks, sys.stdout)
-    except OSError as exc:
-        return _fail(parser.prog, exc)
+    print(f"Dropped {dropped} duplicate sequences", file=sys.stderr)
+    cma.write(blocks, sys.stdout)
     return 0
 
 
@@ -137,14 +180,14 @@ def _best_by_id(sequences):
     return [seq for idx, seq in enumerate(sequences) if idx in keep]
 
 
-def tweak_main(argv=None):
+@_console
+def tweak_main(argv, prog):
     """cma-tweak: change block-level features of a CMA file."""
     parser = argparse.ArgumentParser(
-        prog="cma-tweak",
+        prog=prog,
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description="Change CMA-specific features of each block in a CMA file.",
-        epilog="example:\n"
-        "  cma-tweak foo.cma --iron --level 1 --name Testfam -o bar.cma",
+        epilog=f"example:\n  {prog} foo.cma --iron --level 1 --name Testfam -o bar.cma",
     )
     _add_infile(parser)
     parser.add_argument(
@@ -168,11 +211,9 @@ def tweak_main(argv=None):
     )
     args = parser.parse_args(argv)
 
-    try:
-        blocks = [_tweak_block(block, args) for block in cma.parse(_input(args.infile))]
-        cma.write(blocks, _output(args.output))
-    except OSError as exc:
-        return _fail(parser.prog, exc)
+    with contextlib.closing(cma.parse(_input(args.infile))) as parsed:
+        blocks = [_tweak_block(block, args) for block in parsed]
+    cma.write(blocks, _output(args.output))
     return 0
 
 
