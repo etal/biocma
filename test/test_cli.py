@@ -45,7 +45,8 @@ def test_blocks_writes_aligned_columns(fikk_cma, capsys):
     assert alignment.get_alignment_length() == 255
     assert alignment[0].description == "FIKK consensus"
     assert alignment[1].description.startswith(
-        "psu|MAL7P1.127 | organism=Plasmodium_falciparum_3D7")
+        "psu|MAL7P1.127 | organism=Plasmodium_falciparum_3D7"
+    )
 
 
 @pytest.mark.parametrize("args", [[], ["-"]], ids=["default", "dash"])
@@ -116,14 +117,16 @@ def test_dedupe_keeps_best_and_last_of_ties(fikk_cma, tmp_path, capsys):
     assert [(seq["id"], seq["description"]) for seq in kept[:3]] == [
         (first["id"], first["description"]),
         (second["id"], second["description"]),
-        (third["id"], "tie")]
+        (third["id"], "tie"),
+    ]
 
 
 def test_dedupe_compares_ids_within_each_block(fikk_cma, tmp_path, capsys):
     block = cma.read(fikk_cma)
     # Both blocks hold the same 24 IDs; only the first repeats one of them.
-    repeated = dict(block, name="repeated",
-                    sequences=block["sequences"] + block["sequences"][1:2])
+    repeated = dict(
+        block, name="repeated", sequences=block["sequences"] + block["sequences"][1:2]
+    )
     infile = str(tmp_path / "blocks.cma")
     cma.write([repeated, block], infile)
 
@@ -137,10 +140,12 @@ def test_dedupe_compares_ids_within_each_block(fikk_cma, tmp_path, capsys):
 def test_dedupe_reports_write_error(fikk_cma, monkeypatch, capsys):
     def fail(blocks, outfile):
         raise OSError(28, "No space left on device")
+
     monkeypatch.setattr(cma, "write", fail)
     assert cli.dedupe_main([fikk_cma]) == 1
     assert capsys.readouterr().err.endswith(
-        "cma-dedupe: error: [Errno 28] No space left on device\n")
+        "cma-dedupe: error: [Errno 28] No space left on device\n"
+    )
 
 
 def test_tweak_sets_level_and_name(fikk_cma, tmp_path):
@@ -149,8 +154,9 @@ def test_tweak_sets_level_and_name(fikk_cma, tmp_path):
     assert cma.read(raised)["level"] == 2
     # Level 0 must also be settable, to reset a non-zero level.
     reset = str(tmp_path / "reset.cma")
-    assert cli.tweak_main(
-        [raised, "--level", "0", "--name", "Testfam", "-o", reset]) == 0
+    assert (
+        cli.tweak_main([raised, "--level", "0", "--name", "Testfam", "-o", reset]) == 0
+    )
     block = cma.read(reset)
     assert (block["level"], block["name"]) == (0, "Testfam")
 
@@ -166,11 +172,17 @@ def test_tweak_irons_indel_transitions(fikk_cma, tmp_path, capsys):
     block = cma.read(fikk_cma)
     # The example in cma.iron's docstring: 13 residues in 12 aligned columns.
     # test/fikk.cma has nothing to iron.
-    bent = dict(block["sequences"][0], id="bent", description="", length=13,
-                seq="AAAAbc--de-f--gAAA")
+    bent = dict(
+        block["sequences"][0],
+        id="bent",
+        description="",
+        length=13,
+        seq="AAAAbc--de-f--gAAA",
+    )
     infile = str(tmp_path / "bent.cma")
-    cma.write(dict(block, query_length=12, query_chars="*" * 12,
-                   sequences=[bent]), infile)
+    cma.write(
+        dict(block, query_length=12, query_chars="*" * 12, sequences=[bent]), infile
+    )
 
     assert cli.tweak_main([infile, "--iron"]) == 0
     ironed = cma.read(io.StringIO(capsys.readouterr().out))["sequences"]

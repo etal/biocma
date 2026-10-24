@@ -10,8 +10,9 @@ from biocma import cma, utils
 def make_block(*rows):
     return {
         "query_length": sum(not c.islower() for c in rows[0]),
-        "sequences": [{"id": "s%d" % i, "seq": row, "head_len": 0}
-                      for i, row in enumerate(rows)],
+        "sequences": [
+            {"id": "s%d" % i, "seq": row, "head_len": 0} for i, row in enumerate(rows)
+        ],
     }
 
 
@@ -28,17 +29,33 @@ def test_get_inserts(fikk_cma, fikk_fasta):
     with open(fikk_fasta) as handle:
         fullseqs = SeqIO.to_dict(SeqIO.parse(handle, "fasta"))
     for sequence, targets in (
-        (block['sequences'][1], ['n', 't', 'fyklyllkkydsntlfnv']),
-        (block['sequences'][-1], ['altkl', 'nkl',
-                                  'siptvgfskdgdrlqemykasvcsyteecqg',
-                                  'ndndgeylldge', 'eh', 'p',
-                                  'epecancneedknmsennhkkdskhkgdsnhksdsnhksdsnhksdsnhksgsnhksdcnhksgsnhksdsnhqsdcnhmsdhnhksdnnhksdsshksdsshksdsshksgsnhksdnnhksdsshksgsnhksdhnhksdsnhksdsnhknesnhknesnhknesnhknesnhknesnhkndsnhksdsnhmsdhnhksdnnhksdhnhmsdhnhksdnnhksdnnhmsdhnhksdnnhksdnnhksdnnhksdhnhmsdhnhksdnnhksdhnhksdsnhmsdhnhmsdhnhksdhnhksdhnhksdnnhksdsnhksdsnhksdhnhksdsnhmsdhnhmsdhnhksdhnhksdnnhksdsnhksdsnhksdhnhksdsnhmsdhnhmsdhnhmsdhnhksdhnhksdnnhksdsnhksdsnhksdsnhksdhnhksdhkhmsdnnhksdnnhksdhnhksdnnhksdhnhksdsnhksdsnhksdsnhksdsnhksdnnhksdhnhnsdsnhmsdhnhksdhnhksdhnhksdnnhksdnnhksdhnhksdhkknnnnnkdnknddnddsdasdavhediellesysdlnkfnemlteqln',
-                                  'vt', 'edtrv', 'pmythnl', 'g',
-                                  'sfqscqpcv', 'iirehiklkidnpfehlstitdqee',
-                                  'yfd', 'ra', 'fqlak'])):
-        full = fullseqs[sequence['id']]
-        ins_ranges = [str(full.seq)[start-1:end]
-                      for start, end in inserts[sequence['id']]]
+        (block["sequences"][1], ["n", "t", "fyklyllkkydsntlfnv"]),
+        (
+            block["sequences"][-1],
+            [
+                "altkl",
+                "nkl",
+                "siptvgfskdgdrlqemykasvcsyteecqg",
+                "ndndgeylldge",
+                "eh",
+                "p",
+                "epecancneedknmsennhkkdskhkgdsnhksdsnhksdsnhksdsnhksgsnhksdcnhksgsnhksdsnhqsdcnhmsdhnhksdnnhksdsshksdsshksdsshksgsnhksdnnhksdsshksgsnhksdhnhksdsnhksdsnhknesnhknesnhknesnhknesnhknesnhkndsnhksdsnhmsdhnhksdnnhksdhnhmsdhnhksdnnhksdnnhmsdhnhksdnnhksdnnhksdnnhksdhnhmsdhnhksdnnhksdhnhksdsnhmsdhnhmsdhnhksdhnhksdhnhksdnnhksdsnhksdsnhksdhnhksdsnhmsdhnhmsdhnhksdhnhksdnnhksdsnhksdsnhksdhnhksdsnhmsdhnhmsdhnhmsdhnhksdhnhksdnnhksdsnhksdsnhksdsnhksdhnhksdhkhmsdnnhksdnnhksdhnhksdnnhksdhnhksdsnhksdsnhksdsnhksdsnhksdnnhksdhnhnsdsnhmsdhnhksdhnhksdhnhksdnnhksdnnhksdhnhksdhkknnnnnkdnknddnddsdasdavhediellesysdlnkfnemlteqln",
+                "vt",
+                "edtrv",
+                "pmythnl",
+                "g",
+                "sfqscqpcv",
+                "iirehiklkidnpfehlstitdqee",
+                "yfd",
+                "ra",
+                "fqlak",
+            ],
+        ),
+    ):
+        full = fullseqs[sequence["id"]]
+        ins_ranges = [
+            str(full.seq)[start - 1 : end] for start, end in inserts[sequence["id"]]
+        ]
         assert [ins.lower() for ins in ins_ranges] == targets
 
 

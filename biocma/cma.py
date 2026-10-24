@@ -17,6 +17,7 @@ def parse(infile):
         for block in _parse_blocks(instream):
             yield block
 
+
 read = sugar.make_reader(parse)
 
 # --------------------------------------------------------------------
@@ -27,15 +28,16 @@ read = sugar.make_reader(parse)
 #   parse line 1
 #   parse line 2
 #   pass control to _parse_sequences
-#   
+#
 #       _parse_sequences:
-#       read a non-blank line; 
+#       read a non-blank line;
 #           if END: return (w/ all sequences accumulated)
 #           else:
 #               read 2 more non-blank lines
 #               parse the 3 read lines & bundle up data
 #               yield a seq
-#       
+#
+
 
 def _parse_blocks(instream):
     """Parse an alignment block from the given file handle.
@@ -51,7 +53,7 @@ def _parse_blocks(instream):
     """
     ilines = sugar.unblank(instream)
     for line in ilines:
-        if line.startswith('['):
+        if line.startswith("["):
             # Start of block
             level, one, name, seqcount, params = _parse_block_header(line)
             qlen, qchars = _parse_block_postheader(next(ilines))
@@ -59,16 +61,21 @@ def _parse_blocks(instream):
             sequences = list(_parse_sequences(ilines, qlen))
             # Validation
             if not len(sequences) == seqcount:
-                logger.warning("Expected %d sequences in block %s, found %d",
-                               seqcount, name, len(sequences))
-            yield {'level': level,
-                   'one': one,
-                   'name': name,
-                   'params': params,
-                   'query_length': qlen,
-                   'query_chars': qchars,
-                   'sequences': sequences,
-                   }
+                logger.warning(
+                    "Expected %d sequences in block %s, found %d",
+                    seqcount,
+                    name,
+                    len(sequences),
+                )
+            yield {
+                "level": level,
+                "one": one,
+                "name": name,
+                "params": params,
+                "query_length": qlen,
+                "query_chars": qchars,
+                "sequences": sequences,
+            }
 
 
 def _parse_sequences(ilines, expect_qlen):
@@ -83,7 +90,7 @@ def _parse_sequences(ilines, expect_qlen):
     """
     while True:
         first = next(ilines)
-        if first.startswith('_') and first.endswith('].'):
+        if first.startswith("_") and first.endswith("]."):
             # End of sequences & end of block
             break
 
@@ -91,20 +98,25 @@ def _parse_sequences(ilines, expect_qlen):
         try:
             index, this_len, query_len = _parse_seq_preheader(first)
         except ValueError:
-            logger.warning('Unparseable line (SKIPPING):\n%s', first)
+            logger.warning("Unparseable line (SKIPPING):\n%s", first)
             continue
-        (rec_id, dbxrefs, headlen, taillen, phylum, taxchar, description
-                ) = _parse_seq_header(next(ilines))
+        (rec_id, dbxrefs, headlen, taillen, phylum, taxchar, description) = (
+            _parse_seq_header(next(ilines))
+        )
         try:
             headseq, molseq, tailseq = _parse_seq_body(next(ilines))
         except ValueError:
-            logger.warning('Unparseable sequence: %s -- SKIPPING', rec_id)
+            logger.warning("Unparseable sequence: %s -- SKIPPING", rec_id)
             continue
 
         # Validation
         if expect_qlen != query_len:
-            logger.warning("Query length in %s given as %d; expected %d",
-                           rec_id, query_len, expect_qlen)
+            logger.warning(
+                "Query length in %s given as %d; expected %d",
+                rec_id,
+                query_len,
+                expect_qlen,
+            )
         if not headseq and not headlen:
             headlen = 0
         if not tailseq and not taillen:
@@ -113,41 +125,51 @@ def _parse_sequences(ilines, expect_qlen):
             if headlen is None:
                 headlen = len(headseq)
             elif headlen != len(headseq):
-                logger.warning("Conflicting head flank lengths in %s: %d, %d",
-                               rec_id, headlen, len(headseq))
+                logger.warning(
+                    "Conflicting head flank lengths in %s: %d, %d",
+                    rec_id,
+                    headlen,
+                    len(headseq),
+                )
         if tailseq:
             if taillen is None:
                 taillen = len(tailseq)
             elif taillen != len(tailseq):
-                logger.warning("Conflicting tail flank lengths in %s: %d, %d",
-                               rec_id, taillen, len(tailseq))
+                logger.warning(
+                    "Conflicting tail flank lengths in %s: %d, %d",
+                    rec_id,
+                    taillen,
+                    len(tailseq),
+                )
 
-        yield {'index': index,
-               'id': rec_id,
-               'description': description,
-               'dbxrefs': dbxrefs,
-               'phylum': phylum,
-               'taxchar': taxchar,
-               'head_len': headlen,
-               'tail_len': taillen,
-               'head_seq': headseq,
-               'tail_seq': tailseq,
-               'length': this_len,
-               'seq': molseq,
-               }
+        yield {
+            "index": index,
+            "id": rec_id,
+            "description": description,
+            "dbxrefs": dbxrefs,
+            "phylum": phylum,
+            "taxchar": taxchar,
+            "head_len": headlen,
+            "tail_len": taillen,
+            "head_seq": headseq,
+            "tail_seq": tailseq,
+            "length": this_len,
+            "seq": molseq,
+        }
 
 
 # Microparsing
+
 
 def _parse_block_header(line):
     """
     [0_(1)=fa2cma(8){go=10000,gx=2000,pn=1000.0,lf=0,rf=0}:
     """
     level = line[1]
-    one, _rest = line[4:].split(')=', 1)
-    name, _rest = _rest.split('(', 1)
-    seqcount, _rest = _rest.split(')', 1)
-    params = _rest.strip('{}:')
+    one, _rest = line[4:].split(")=", 1)
+    name, _rest = _rest.split("(", 1)
+    seqcount, _rest = _rest.split(")", 1)
+    params = _rest.strip("{}:")
     return int(level), int(one), name, int(seqcount), params
 
 
@@ -155,11 +177,12 @@ def _parse_block_postheader(line):
     """
     (209)**************!*****************!!*************...
     """
-    parts = line[1:].split(')', 1)
+    parts = line[1:].split(")", 1)
     qlen = int(parts[0])
     if not len(parts[1]) == qlen:
-        logger.warning("postheader expected %d-long query, found %d",
-                       qlen, len(parts[1]))
+        logger.warning(
+            "postheader expected %d-long query, found %d", qlen, len(parts[1])
+        )
     return qlen, parts[1]
 
 
@@ -191,11 +214,11 @@ def _parse_seq_header(line):
     """
     _parts = line[1:].split(None, 1)
     rec_id = _parts[0]
-    descr = _parts[1] if _parts[1:] else ''
+    descr = _parts[1] if _parts[1:] else ""
     # Database cross references
     dbxrefs = {}
-    if '|' in rec_id:
-        id_gen = iter(rec_id.rstrip('|').split('|'))
+    if "|" in rec_id:
+        id_gen = iter(rec_id.rstrip("|").split("|"))
         for key in id_gen:
             try:
                 dbxrefs[key] = next(id_gen)
@@ -204,10 +227,11 @@ def _parse_seq_header(line):
 
     # Head/tail lengths and taxonomy codes
     headlen = taillen = None
-    phylum = taxchar = ''
-    if descr.startswith('{'):
-        _deets, description = descr[1:].split('}', 1)
-        match = re.search(r"""
+    phylum = taxchar = ""
+    if descr.startswith("{"):
+        _deets, description = descr[1:].split("}", 1)
+        match = re.search(
+            r"""
         (?:
         \| (?P<headlen> \d+)
             \( (?P<taillen> \d+)
@@ -220,7 +244,10 @@ def _parse_seq_header(line):
             \)
         >
         )?
-        """, _deets, re.VERBOSE)
+        """,
+            _deets,
+            re.VERBOSE,
+        )
         if match:
             headlen, taillen, phylum, taxchar = match.groups()
             if headlen is not None:
@@ -228,9 +255,9 @@ def _parse_seq_header(line):
             if taillen is not None:
                 taillen = int(taillen)
             if phylum is None:
-                phylum = ''
+                phylum = ""
             if taxchar is None:
-                taxchar = ''
+                taxchar = ""
         else:
             logger.warning("Couldn't match head/tail: %s", _deets)
     else:
@@ -255,31 +282,31 @@ def _parse_seq_body(line):
     regions that are not part of the alignment block (I think). Most tools don't
     include them, but some do, apparently.
     """
-    line = line.rstrip('*')
-    if '{()' in line:
-        head, _rest = line.split('{()', 1)
+    line = line.rstrip("*")
+    if "{()" in line:
+        head, _rest = line.split("{()", 1)
     else:
         # Match parens
-        _rest = line.split('{(', 1)[1]
-        head, _rest = _rest.split(')', 1)
-    if '()}' in _rest:
-        molseq, tail = _rest.split('()}', 1)
+        _rest = line.split("{(", 1)[1]
+        head, _rest = _rest.split(")", 1)
+    if "()}" in _rest:
+        molseq, tail = _rest.split("()}", 1)
     else:
         # Match parens
-        molseq, _rest = _rest.split('(', 1)
-        tail = _rest.split(')}', 1)[0]
+        molseq, _rest = _rest.split("(", 1)
+        tail = _rest.split(")}", 1)[0]
     return (head, molseq, tail)
 
 
 # --------------------------------------------------------------------
 # Write
 
+
 def write(blocks, outfile):
-    if isinstance(blocks, dict) and 'sequences' in blocks:
+    if isinstance(blocks, dict) and "sequences" in blocks:
         blocks = [blocks]
-    with sugar.maybe_open(outfile, 'w+') as outstream:
-        outstream.writelines(
-                itertools.chain(*map(_format_block, blocks)))
+    with sugar.maybe_open(outfile, "w+") as outstream:
+        outstream.writelines(itertools.chain(*map(_format_block, blocks)))
 
 
 def _format_block(block):
@@ -290,14 +317,12 @@ def _format_block(block):
 [{level}_({one})={name}({seqcount}){{{params}}}:
 ({query_length}){query_chars}
 
-""".format(
-        seqcount=len(block['sequences']),
-        **block)
+""".format(seqcount=len(block["sequences"]), **block)
     # Sequences
-    for s in _format_sequences(block['sequences'], block['query_length']):
+    for s in _format_sequences(block["sequences"], block["query_length"]):
         yield s
     # Block close
-    yield "_%s].\n" % block['level']
+    yield "_%s].\n" % block["level"]
 
 
 def _format_sequences(sequences, query_length):
@@ -305,12 +330,19 @@ def _format_sequences(sequences, query_length):
     # >2QG5|A  {|27(6)|}
     # {()YTLENTIGRGSWGEVKIAVQKGTRIRRAAKKIPKYFV---EDVDRFKQEIEIMKSLDHPNIIRLYETFEDNTDIYLVMELCTGGELFERVVHKRVFRESDAARIMKDVLSAVAYCHKLNVAHRDLKPENFLFltdSPDSPLKLIDFGLAARFkpGKMMRTKVGTPYYVSPQVLEGL-YGPECDEWSAGVMMYVLLCGYPPFSAPTDXEVMLKIREGTFtfpeKDWLNVSPQAESLIRRLLTKSPKQRIT-----SLQALEHEW-()}*
     for idx, seq in enumerate(sequences):
-        head_tail = ("|{head_len}({tail_len})|".format(**seq)
-                    if seq['head_len'] or seq['tail_len'] else "")
-        taxonomy=("<{phylum}({taxchar})>".format(**seq)
-                    if seq['phylum'] and seq['taxchar'] else "")
-        special_header = ("{{{0}{1}}}".format(head_tail, taxonomy)
-                    if head_tail or taxonomy else "")
+        head_tail = (
+            "|{head_len}({tail_len})|".format(**seq)
+            if seq["head_len"] or seq["tail_len"]
+            else ""
+        )
+        taxonomy = (
+            "<{phylum}({taxchar})>".format(**seq)
+            if seq["phylum"] and seq["taxchar"]
+            else ""
+        )
+        special_header = (
+            "{{{0}{1}}}".format(head_tail, taxonomy) if head_tail or taxonomy else ""
+        )
         yield """\
 ${index}={length}({0}):
 >{id} {1}{description}
@@ -322,7 +354,8 @@ ${index}={length}({0}):
 # --------------------------------------------------------------------
 # Utilities
 
-def realign_seqs(block, gap_char='.', align_indels=False):
+
+def realign_seqs(block, gap_char=".", align_indels=False):
     """Add gaps to a block so all residues in a column are equivalent.
 
     Given a block, containing a list of "sequences" (dicts) each containing a
@@ -340,7 +373,7 @@ def realign_seqs(block, gap_char='.', align_indels=False):
     `return`: a list of realigned sequence strings.
     """
     # ENH: align inserts using an external tool (if align_indels)
-    all_chars = [list(sq['seq']) for sq in block['sequences']]
+    all_chars = [list(sq["seq"]) for sq in block["sequences"]]
     # NB: If speed is an issue here, consider Numpy or Cython
     #   main problem: list.insert is O(n) -- would OrderedDict help?
     nrows = len(all_chars)
@@ -351,7 +384,7 @@ def realign_seqs(block, gap_char='.', align_indels=False):
             for row in rows_need_gaps:
                 row.insert(i, gap_char)
         i += 1
-    return [''.join(row) for row in all_chars]
+    return ["".join(row) for row in all_chars]
 
 
 def consensus2block(record, level=0, name=None, molseq=None):
@@ -364,17 +397,16 @@ def consensus2block(record, level=0, name=None, molseq=None):
     """
     if molseq is None:
         molseq = str(record.seq)
-    cons_ungap = molseq.replace('-', '').replace('.', '').upper()
+    cons_ungap = molseq.replace("-", "").replace(".", "").upper()
     return dict(
-            level=level,
-            one=1,
-            name=name or record.id,
-            params='go=10000,gx=2000,pn=1000.0,lf=0,rf=0',
-            query_length=len(cons_ungap),
-            query_chars='*'*len(cons_ungap),
-            sequences=[seqrecord2sequence(record, len(cons_ungap), 1,
-                                          molseq=cons_ungap)]
-            )
+        level=level,
+        one=1,
+        name=name or record.id,
+        params="go=10000,gx=2000,pn=1000.0,lf=0,rf=0",
+        query_length=len(cons_ungap),
+        query_chars="*" * len(cons_ungap),
+        sequences=[seqrecord2sequence(record, len(cons_ungap), 1, molseq=cons_ungap)],
+    )
 
 
 def seqrecord2sequence(record, qlen, index, molseq=None):
@@ -385,29 +417,32 @@ def seqrecord2sequence(record, qlen, index, molseq=None):
     """
     if molseq is None:
         molseq = str(record.seq)
-    description = (record.description.split(' ', 1)[1]
-            if ' ' in record.description
-            else ' ')
-    return dict(index=index,
-                id=record.id,
-                description=description,
-                dbxrefs={},
-                phylum='',
-                taxchar='',
-                head_len=None,
-                tail_len=None,
-                head_seq='',
-                tail_seq='',
-                length=len(molseq) - molseq.count('-'),
-                seq=molseq,
-                )
+    description = (
+        record.description.split(" ", 1)[1] if " " in record.description else " "
+    )
+    return dict(
+        index=index,
+        id=record.id,
+        description=description,
+        dbxrefs={},
+        phylum="",
+        taxchar="",
+        head_len=None,
+        tail_len=None,
+        head_seq="",
+        tail_seq="",
+        length=len(molseq) - molseq.count("-"),
+        seq=molseq,
+    )
+
 
 def replace_asterisks(seq, label=None):
-    if '*' in seq:
+    if "*" in seq:
         logger.warning(
             "Sequence %scontains '*' character; replacing with 'X'",
-            str(label) + ' ' if label else '')
-    return str(seq).replace('*', 'X')
+            str(label) + " " if label else "",
+        )
+    return str(seq).replace("*", "X")
 
 
 def collapse_to_consensus(seqrecords, strict=False, do_iron=True):
@@ -417,8 +452,8 @@ def collapse_to_consensus(seqrecords, strict=False, do_iron=True):
 
     The first record must be the consensus.
     """
-    level = getattr(seqrecords, 'level', 0)
-    name = getattr(seqrecords, 'name', None)
+    level = getattr(seqrecords, "level", 0)
+    name = getattr(seqrecords, "name", None)
     # rows is a new list; the caller's input is not modified
     consensus, *rows = seqrecords
     cons_seq = str(consensus.seq)
@@ -427,52 +462,57 @@ def collapse_to_consensus(seqrecords, strict=False, do_iron=True):
         if len(s) != cons_length:
             raise ValueError(
                 "Sequence #%d has length %d, consensus is %d"
-                % (index, len(s), cons_length))
+                % (index, len(s), cons_length)
+            )
 
-    if '.' in cons_seq:
+    if "." in cons_seq:
         # Strict -- error if there's a '-'
-        if '-' in cons_seq:
+        if "-" in cons_seq:
             if strict:
                 raise ValueError("Consensus contains '-' gap characters")
-            logger.warning("Consensus sequence contains both '.' and '-' gap "
-                           "characters -- is it really the consensus?")
-            aligned_cols = [(c not in '.-') for c in cons_seq]
+            logger.warning(
+                "Consensus sequence contains both '.' and '-' gap "
+                "characters -- is it really the consensus?"
+            )
+            aligned_cols = [(c not in ".-") for c in cons_seq]
         else:
-            aligned_cols = [c != '.' for c in cons_seq]
+            aligned_cols = [c != "." for c in cons_seq]
     else:
         # A little more ambiguous...
-        aligned_cols = [c != '-' for c in cons_seq]
+        aligned_cols = [c != "-" for c in cons_seq]
 
     # Start a block with the consensus sequence
-    block = consensus2block(consensus, level=level, name=name,
-                            molseq=replace_asterisks(cons_seq, 'consensus'))
-    qlen = block['query_length']
+    block = consensus2block(
+        consensus,
+        level=level,
+        name=name,
+        molseq=replace_asterisks(cons_seq, "consensus"),
+    )
+    qlen = block["query_length"]
 
     # Collapse & add remaining sequences to the block
     for index, rec in enumerate(rows, 2):
         # Collapse rec.seq down to aligned size
         new_mol_seq = []
         is_beginning = True
-        for aligned_col, char in zip(aligned_cols,
-                                     replace_asterisks(rec.seq, index)):
+        for aligned_col, char in zip(aligned_cols, replace_asterisks(rec.seq, index)):
             if aligned_col:
                 is_beginning = False
-                if char in '-.':
+                if char in "-.":
                     # deletion
-                    new_mol_seq.append('-')
+                    new_mol_seq.append("-")
                 else:
                     # aligned character
                     new_mol_seq.append(char.upper())
             else:
                 # it's an insert or nothing
                 # (also, skip any left-side inserts)
-                if char not in '-.' and not is_beginning:
+                if char not in "-." and not is_beginning:
                     new_mol_seq.append(char.lower())
-        molseq = ''.join(new_mol_seq)
+        molseq = "".join(new_mol_seq)
         if do_iron:
             molseq = iron(molseq)
-        block['sequences'].append(seqrecord2sequence(rec, qlen, index,
-                                                     molseq=molseq))
+        block["sequences"].append(seqrecord2sequence(rec, qlen, index, molseq=molseq))
 
     return block
 
@@ -487,7 +527,7 @@ def iron(sequence):
     Result:
         AAAABCDEFgAAA
     """
-    r_indel = re.compile(r'(-[a-y]|[a-y]-)')
+    r_indel = re.compile(r"(-[a-y]|[a-y]-)")
     orig_sequence = sequence
     while r_indel.search(sequence):
         in_insert = False
@@ -506,7 +546,7 @@ def iron(sequence):
                     in_insert = False
                     outchars.extend(inserts)
                     inserts = []
-                    outchars.append('-' * seen_gaps)
+                    outchars.append("-" * seen_gaps)
                     seen_gaps = 0
                     outchars.append(char)
                 else:
@@ -514,7 +554,7 @@ def iron(sequence):
                     # If the indel and gap are both multiple chars, this will
                     # capitalize the insert left-to-right, then leave any gap
                     # remainer as-is.
-                    assert char == '-'
+                    assert char == "-"
                     if not inserts:
                         in_insert = False
                         in_gap = True
@@ -535,7 +575,7 @@ def iron(sequence):
                     # If no inserts have been seen yet, we'll iron this indel
                     if inserts:
                         outchars.extend(inserts)
-                        outchars.append('-' * seen_gaps)
+                        outchars.append("-" * seen_gaps)
                         seen_gaps = 0
                     inserts = [char]
                 elif char.isupper():
@@ -544,18 +584,19 @@ def iron(sequence):
                     if inserts:
                         outchars.extend(inserts)
                         inserts = []
-                    outchars.append('-' * seen_gaps)
+                    outchars.append("-" * seen_gaps)
                     seen_gaps = 0
                     outchars.append(char)
                 else:
                     # Extend the gap
-                    assert char == '-'
+                    assert char == "-"
                     seen_gaps += 1
 
             else:
                 assert not inserts and not seen_gaps, (
                     "Inserts: %s, gaps: %s, seq: %s, in_ins=%s, in_gap=%s"
-                    % (inserts, seen_gaps, sequence, in_insert, in_gap))
+                    % (inserts, seen_gaps, sequence, in_insert, in_gap)
+                )
                 # Coming from Match state
                 if char.isupper():
                     # Extend the match
@@ -564,7 +605,7 @@ def iron(sequence):
                     inserts.append(char)
                     in_insert = True
                 else:
-                    assert char == '-'
+                    assert char == "-"
                     seen_gaps += 1
                     in_gap = True
 
@@ -572,11 +613,9 @@ def iron(sequence):
         if inserts:
             outchars.extend(inserts)
         if seen_gaps:
-            outchars.append('-' * seen_gaps)
-        sequence = ''.join(outchars)
-        assert (sequence.replace('-', '').upper()
-                ==
-                orig_sequence.replace('-', '').upper()), \
-                '\nOrig: ' + orig_sequence + \
-                '\nIron: ' + sequence
+            outchars.append("-" * seen_gaps)
+        sequence = "".join(outchars)
+        assert (
+            sequence.replace("-", "").upper() == orig_sequence.replace("-", "").upper()
+        ), "\nOrig: " + orig_sequence + "\nIron: " + sequence
     return sequence

@@ -23,6 +23,7 @@ def parse(infile):
     for block in cma.parse(infile):
         yield ChainMultiAlignment.from_block(block)
 
+
 read = sugar.make_reader(parse)
 
 
@@ -33,10 +34,10 @@ def write(msas, outfile, do_iron=True):
 
 
 def convert(in_file, in_fmt, out_file, out_fmt):
-    records = list(parse(in_file)
-            if in_fmt == 'cma'
-            else AlignIO.parse(in_file, in_fmt))
-    if out_fmt == 'cma':
+    records = list(
+        parse(in_file) if in_fmt == "cma" else AlignIO.parse(in_file, in_fmt)
+    )
+    if out_fmt == "cma":
         write(records, out_file)
     else:
         AlignIO.write(records, out_file, out_fmt)
@@ -45,14 +46,16 @@ def convert(in_file, in_fmt, out_file, out_fmt):
 class ChainMultiAlignment(MultipleSeqAlignment):
     """Based on Biopython's class for a multiple sequence alignment."""
 
-    def __init__(self, records,
-            # CMA-specific attributes here
-            level=0,
-            name=None,
-            params=None,
-            query_length=None,
-            query_chars=None,
-            ):
+    def __init__(
+        self,
+        records,
+        # CMA-specific attributes here
+        level=0,
+        name=None,
+        params=None,
+        query_length=None,
+        query_chars=None,
+    ):
         MultipleSeqAlignment.__init__(self, records)
         self.level = level
         self.name = name
@@ -64,32 +67,35 @@ class ChainMultiAlignment(MultipleSeqAlignment):
     def from_block(cls, block):
         """Instantiate this class given a raw block from cma.parse."""
         rseqs = cma.realign_seqs(block)
-        records = (SeqRecord(Seq(rseq),
-                    id=bseq['id'],
-                    description=bseq['description'],
-                    dbxrefs=list(bseq['dbxrefs'].values()),
-                    annotations=dict(
-                        # NB: always protein; X is OK
-                        molecule_type='protein',
-                        index=bseq['index'],
-                        length=bseq['length'],
-                        dbxrefs=bseq['dbxrefs'],
-                        phylum=bseq['phylum'],
-                        taxchar=bseq['taxchar'],
-                        head_seq=bseq['head_seq'],
-                        tail_seq=bseq['tail_seq'],
-                        head_len=bseq['head_len'],
-                        tail_len=bseq['tail_len'],
-                        ),
-                    # ENH: annotate with conservation levels
-                    )
-                for bseq, rseq in zip(block['sequences'], rseqs))
-        return cls(records,
-                # CMA attributes
-                block['level'],
-                block['name'],
-                block['params'],
-                block['query_length'],
-                block['query_chars'],
-                )
-
+        records = (
+            SeqRecord(
+                Seq(rseq),
+                id=bseq["id"],
+                description=bseq["description"],
+                dbxrefs=list(bseq["dbxrefs"].values()),
+                annotations=dict(
+                    # NB: always protein; X is OK
+                    molecule_type="protein",
+                    index=bseq["index"],
+                    length=bseq["length"],
+                    dbxrefs=bseq["dbxrefs"],
+                    phylum=bseq["phylum"],
+                    taxchar=bseq["taxchar"],
+                    head_seq=bseq["head_seq"],
+                    tail_seq=bseq["tail_seq"],
+                    head_len=bseq["head_len"],
+                    tail_len=bseq["tail_len"],
+                ),
+                # ENH: annotate with conservation levels
+            )
+            for bseq, rseq in zip(block["sequences"], rseqs)
+        )
+        return cls(
+            records,
+            # CMA attributes
+            block["level"],
+            block["name"],
+            block["params"],
+            block["query_length"],
+            block["query_chars"],
+        )

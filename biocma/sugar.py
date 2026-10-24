@@ -15,13 +15,15 @@ def make_reader(parser):
         except StopIteration:
             return first
         else:
-            raise ValueError("Input file contains multiple elements; "
-                    "use parse() instead.")
+            raise ValueError(
+                "Input file contains multiple elements; use parse() instead."
+            )
+
     return read
 
 
 @contextlib.contextmanager
-def maybe_open(infile, mode='r'):
+def maybe_open(infile, mode="r"):
     """Take a file name or a handle, and return a handle.
 
     Simplifies creating functions that automagically accept either a file name
@@ -42,5 +44,3 @@ def maybe_open(infile, mode='r'):
 def unblank(stream):
     """Remove blank lines from a file being read iteratively."""
     return filter(None, (line.strip() for line in stream))
-
-

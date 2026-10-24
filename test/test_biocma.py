@@ -18,8 +18,7 @@ def round_trip(aln):
 
 
 def ungapped(aln):
-    return [str(rec.seq).replace("-", "").replace(".", "").upper()
-            for rec in aln]
+    return [str(rec.seq).replace("-", "").replace(".", "").upper() for rec in aln]
 
 
 def test_read(fikk_cma):
@@ -66,8 +65,9 @@ def test_write_does_not_modify_alignment(fikk_cma):
 def test_write_irons_indels_by_default():
     # Column 3 is an insert ('.' in the consensus); r1's insert 'x' there sits
     # beside its deletion in column 2, so ironing turns it into a match.
-    aln = MultipleSeqAlignment([SeqRecord(Seq("AB.CDE"), id="cons"),
-                                SeqRecord(Seq("A-xC-E"), id="r1")])
+    aln = MultipleSeqAlignment(
+        [SeqRecord(Seq("AB.CDE"), id="cons"), SeqRecord(Seq("A-xC-E"), id="r1")]
+    )
     buf = io.StringIO()
     biocma.write([aln], buf)
     block = cma.read(io.StringIO(buf.getvalue()))
