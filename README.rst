@@ -96,11 +96,30 @@ Unless you're working with MAPGAPS or CHAIN, no.
 Development
 -----------
 
-Development uses uv_, which installs the package in editable mode together with
-the tools in the ``dev`` dependency group, at the versions recorded in
-``uv.lock``::
+Two development workflows are supported from the same ``pyproject.toml``.
+Both install the package in editable mode together with the tools in the
+``dev`` dependency group, pytest and ruff.
+
+uv_ takes every package from PyPI, at the versions recorded in ``uv.lock``::
 
     uv sync
     uv run pytest
+    uv run ruff check
+    uv run ruff format
+
+pixi_ takes Python, Biopython, pytest and ruff from conda-forge, at the
+versions recorded in ``pixi.lock``. The ``default`` environment uses the latest
+Python that conda-forge provides, and ``py312`` the oldest supported one::
+
+    pixi run test
+    pixi run -e py312 test
+    pixi run lint
+    pixi run fmt
+
+Code is formatted with ``ruff format``, and the commit that first applied it is
+listed in ``.git-blame-ignore-revs``. To skip that commit in ``git blame``::
+
+    git config blame.ignoreRevsFile .git-blame-ignore-revs
 
 .. _uv: https://docs.astral.sh/uv/
+.. _pixi: https://pixi.sh/

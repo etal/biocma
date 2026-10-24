@@ -58,3 +58,33 @@ filterwarnings = ["error"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "LOG", "G"]
+
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["osx-arm64", "linux-64", "win-64"]
+
+# Version constraints live in [project] and [dependency-groups]; pixi derives
+# the "dev" feature from the dependency group, and these entries only make it
+# take the packages from conda-forge rather than PyPI.
+[tool.pixi.dependencies]
+biopython = "*"
+
+[tool.pixi.feature.dev.dependencies]
+pytest = "*"
+ruff = "*"
+
+# The oldest supported Python; keep in step with requires-python.
+[tool.pixi.feature.py312.dependencies]
+python = "3.12.*"
+
+[tool.pixi.pypi-dependencies]
+biocma = { path = ".", editable = true }
+
+[tool.pixi.environments]
+default = { features = ["dev"] }
+py312 = { features = ["dev", "py312"] }
+
+[tool.pixi.tasks]
+test = "pytest"
+lint = "ruff check"
+fmt = "ruff format"
