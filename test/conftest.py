@@ -11,6 +11,12 @@ def fikk_cma():
 
 
 @pytest.fixture
+def fikk_text(fikk_cma):
+    with open(fikk_cma) as handle:
+        return handle.read()
+
+
+@pytest.fixture
 def fikk_fasta():
     return str(DATA_DIR / "fikk-full.fasta")
 

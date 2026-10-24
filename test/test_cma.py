@@ -71,28 +71,24 @@ TRUNCATION_OFFSETS = truncation_offsets()
 @pytest.mark.parametrize(
     "offset", TRUNCATION_OFFSETS.values(), ids=TRUNCATION_OFFSETS.keys()
 )
-def test_parse_rejects_truncated_input(offset, fikk_cma, tmp_path):
-    with open(fikk_cma) as handle:
-        text = handle.read()
+def test_parse_rejects_truncated_input(offset, fikk_text, tmp_path):
     truncated = tmp_path / "truncated.cma"
-    truncated.write_text(text[:offset])
+    truncated.write_text(fikk_text[:offset])
     with pytest.raises(ValueError, match=r"^Malformed CMA block '\[0_\(1\)=FIKK"):
         cma.read(truncated)
     gc.collect()
 
 
 @pytest.mark.parametrize("kept", [1, 2, 3])
-def test_parse_rejects_block_without_terminator(kept, fikk_cma):
-    with open(fikk_cma) as handle:
-        text = handle.read()
+def test_parse_rejects_block_without_terminator(kept, fikk_text):
     # The block cut after the first 1, 2 or 3 lines of its second sequence,
     # then a whole block, whose header comes where the first block expects a
     # sequence's header line, its sequence line, or the next sequence
-    offset = text.index("\n$2=") + 1
+    offset = fikk_text.index("\n$2=") + 1
     for _ in range(kept):
-        offset = text.index("\n", offset) + 1
+        offset = fikk_text.index("\n", offset) + 1
     with pytest.raises(ValueError, match="does not end before the next block"):
-        list(cma.parse(io.StringIO(text[:offset] + text)))
+        list(cma.parse(io.StringIO(fikk_text[:offset] + fikk_text)))
 
 
 def test_parse_passes_encoding_errors_through(fikk_cma):
@@ -107,9 +103,8 @@ def test_parse_passes_encoding_errors_through(fikk_cma):
         cma.read(io.TextIOWrapper(io.BytesIO(data), encoding="utf-8"))
 
 
-def test_parse_skips_sequence_line_without_braces(fikk_cma, caplog):
-    with open(fikk_cma) as handle:
-        lines = handle.read().splitlines(keepends=True)
+def test_parse_skips_sequence_line_without_braces(fikk_text, caplog):
+    lines = fikk_text.splitlines(keepends=True)
     bodies = [i for i, line in enumerate(lines) if line.startswith("{()")]
     lines[bodies[1]] = "NOBRACES\n"
     with caplog.at_level(logging.WARNING):
@@ -180,12 +175,10 @@ def test_parse_header_and_flank_fields(fikk_cma, aaaplus_sma):
     }
 
 
-def test_write_reproduces_source_text(fikk_cma):
-    with open(fikk_cma) as handle:
-        source = handle.read()
+def test_write_reproduces_source_text(fikk_cma, fikk_text):
     written = write_to_str(cma.read(fikk_cma))
     # The writer puts one space after each sequence ID; the fixture has two
-    assert written.split() == source.split()
+    assert written.split() == fikk_text.split()
 
 
 @pytest.mark.parametrize("fixture", ["fikk_cma", "aaaplus_sma"])

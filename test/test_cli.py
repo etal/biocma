@@ -43,11 +43,9 @@ def test_missing_file_is_reported(prog, main, options, tmp_path, capsys):
 
 
 @pytest.mark.parametrize("prog, main, options", COMMANDS)
-def test_malformed_input_is_reported(prog, main, options, fikk_cma, tmp_path, capsys):
-    with open(fikk_cma) as handle:
-        text = handle.read()
+def test_malformed_input_is_reported(prog, main, options, fikk_text, tmp_path, capsys):
     truncated = tmp_path / "truncated.cma"
-    truncated.write_text(text[: len(text) // 2])
+    truncated.write_text(fikk_text[: len(fikk_text) // 2])
     assert main(options + [str(truncated)]) == 1
     out, err = capsys.readouterr()
     assert out == ""
