@@ -26,6 +26,7 @@ jobs:
           environments: default
       - run: pixi run lint --output-format=github
       - run: pixi run fmt --check
+      - run: pixi run typecheck
 
   # conda-forge packages from pixi.lock, at the newest and the oldest
   # supported Python.

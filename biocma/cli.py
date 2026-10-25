@@ -171,7 +171,7 @@ def _best_by_id(sequences):
     The best record has the most uppercase (aligned) residues; of equally good
     records, the last is kept.
     """
-    best = {}
+    best: dict[str, tuple[int, int]] = {}
     for idx, seq in enumerate(sequences):
         score = sum(c.isupper() for c in seq["seq"])
         if seq["id"] not in best or score >= best[seq["id"]][0]:

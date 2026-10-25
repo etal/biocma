@@ -100,7 +100,7 @@ Development
 
 Two development workflows are supported from the same ``pyproject.toml``.
 Both install the package in editable mode together with the tools in the
-``dev`` dependency group, pytest and ruff.
+``dev`` dependency group, pytest, ruff and mypy.
 
 uv_ takes every package from PyPI, at the versions recorded in ``uv.lock``::
 
@@ -108,8 +108,9 @@ uv_ takes every package from PyPI, at the versions recorded in ``uv.lock``::
     uv run pytest
     uv run ruff check
     uv run ruff format
+    uv run mypy
 
-pixi_ takes Python, Biopython, pytest and ruff from conda-forge, at the
+pixi_ takes Python, Biopython, pytest, ruff and mypy from conda-forge, at the
 versions recorded in ``pixi.lock``. The ``default`` environment uses the latest
 Python that conda-forge provides, and ``py312`` the oldest supported one::
 
@@ -117,6 +118,14 @@ Python that conda-forge provides, and ``py312`` the oldest supported one::
     pixi run -e py312 test
     pixi run lint
     pixi run fmt
+    pixi run typecheck
+
+The block and sequence records that ``biocma.cma`` reads and writes are plain
+dicts, described by the ``TypedDict`` classes ``cma.Block`` and
+``cma.Sequence``. mypy checks that every function annotated to return one sets
+exactly the declared keys, and checks a value's type where the type of the
+expression giving it is known; values from unannotated helpers are not
+checked.
 
 Code is formatted with ``ruff format``, and the commit that first applied it is
 listed in ``.git-blame-ignore-revs``. To skip that commit in ``git blame``::

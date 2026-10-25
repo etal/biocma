@@ -40,6 +40,7 @@ repository = "https://github.com/etal/biocma"
 
 [dependency-groups]
 dev = [
+    "mypy>=1.19.1",
     "pytest>=9.0.2",
     "ruff>=0.17.2",
 ]
@@ -59,6 +60,14 @@ filterwarnings = ["error"]
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "LOG", "G"]
 
+[tool.mypy]
+files = ["biocma"]
+# The analysis target, set explicitly rather than taken from the interpreter
+# running mypy. Raise it if a dependency's stubs need newer syntax; it need
+# not match requires-python, which the test matrix covers.
+python_version = "3.12"
+check_untyped_defs = true
+
 [tool.pixi.workspace]
 channels = ["conda-forge"]
 platforms = ["osx-arm64", "linux-64"]
@@ -70,6 +79,7 @@ platforms = ["osx-arm64", "linux-64"]
 biopython = "*"
 
 [tool.pixi.feature.dev.dependencies]
+mypy = "*"
 pytest = "*"
 ruff = "*"
 
@@ -88,3 +98,4 @@ py312 = { features = ["dev", "py312"] }
 test = "pytest"
 lint = "ruff check"
 fmt = "ruff format"
+typecheck = "mypy"

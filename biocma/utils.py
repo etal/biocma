@@ -1,5 +1,7 @@
 from collections import Counter
 
+from .cma import Block, Sequence
+
 
 def find_seq_rec(block, name, case_sensitive=True):
     """Given part of a sequence ID, find the first matching record."""
@@ -32,7 +34,7 @@ def find_seq_id(block, name, case_sensitive=True):
     return rec["id"]
 
 
-def get_consensus(block):
+def get_consensus(block: Block) -> Sequence:
     """Calculate a simple consensus sequence for the block.
 
     Raise a ValueError if the block has no sequences, or if the number of
@@ -54,7 +56,7 @@ def get_consensus(block):
     columns = zip(*rows, strict=True)
     cons_chars = [Counter(col).most_common()[0][0] for col in columns]
     cons_chars = [c if c != "-" else "X" for c in cons_chars]
-    cons_sequence = {
+    return {
         "index": 1,
         "id": "consensus",
         "description": "",
@@ -68,7 +70,6 @@ def get_consensus(block):
         "length": block["query_length"],
         "seq": "".join(cons_chars),
     }
-    return cons_sequence
 
 
 def get_conservation(block):
@@ -139,7 +140,9 @@ def get_equivalent_positions(block):
         #   curr_posn[id] = current equivalent res.num in `id` to cons[i]
         curr_resn[rec["id"]] = rec["head_len"]
 
-    equivalencies = dict((i + 1, {}) for i in range(len(consensus)))
+    equivalencies: dict[int, dict[str, int]] = dict(
+        (i + 1, {}) for i in range(len(consensus))
+    )
     # Map each character position i in the consensus sequence
     # to equivalent residues in each of the other sequences
     #   i = index in the consensus string (== consensus res.num - 1)

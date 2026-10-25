@@ -6,13 +6,44 @@ This handles .chn (CHAIN) files as a collection of CMA blocks, i.e. alignments.
 import itertools
 import logging
 import re
+from collections.abc import Generator
+from typing import TypedDict
 
 from . import sugar
 
 logger = logging.getLogger(__name__)
 
 
-def parse(infile):
+class Sequence(TypedDict):
+    """One sequence record of a CMA block, as cma.parse gives it."""
+
+    index: int
+    id: str
+    description: str
+    dbxrefs: dict[str, str]
+    phylum: str
+    taxchar: str
+    head_len: int
+    tail_len: int
+    head_seq: str
+    tail_seq: str
+    length: int
+    seq: str
+
+
+class Block(TypedDict):
+    """One CMA alignment block, as cma.parse gives it."""
+
+    level: int
+    one: int
+    name: str
+    params: str
+    query_length: int
+    query_chars: str
+    sequences: list[Sequence]
+
+
+def parse(infile) -> Generator[Block, None, None]:
     """Parse each block of a CMA file, given as a path or an open handle.
 
     Raise ValueError, naming the block, if the input ends inside a block or a
@@ -44,7 +75,7 @@ read = sugar.make_reader(parse)
 #
 
 
-def _parse_blocks(instream):
+def _parse_blocks(instream) -> Generator[Block, None, None]:
     """Parse an alignment block from the given file handle.
 
     Block looks like:
@@ -91,7 +122,7 @@ def _parse_blocks(instream):
             }
 
 
-def _parse_sequences(ilines, expect_qlen):
+def _parse_sequences(ilines, expect_qlen) -> Generator[Sequence, None, None]:
     """Parse the sequences in the current block.
 
     Sequence looks like:
@@ -190,7 +221,7 @@ def _next_line(ilines, expected):
 # Microparsing
 
 
-def _parse_block_header(line):
+def _parse_block_header(line) -> tuple[int, int, str, int, str]:
     """
     [0_(1)=fa2cma(8){go=10000,gx=2000,pn=1000.0,lf=0,rf=0}:
 
@@ -205,7 +236,7 @@ def _parse_block_header(line):
     return int(level), int(one), name, int(seqcount), params
 
 
-def _parse_block_postheader(line):
+def _parse_block_postheader(line) -> tuple[int, str]:
     """
     (209)**************!*****************!!*************...
     """
@@ -218,7 +249,7 @@ def _parse_block_postheader(line):
     return qlen, parts[1]
 
 
-def _parse_seq_preheader(line):
+def _parse_seq_preheader(line) -> tuple[int, int, int]:
     """
     $3=227(209):
     """
@@ -226,7 +257,7 @@ def _parse_seq_preheader(line):
     if not match:
         raise ValueError("Unparseable header: " + line)
     index, this_len, query_len = match.groups()
-    return map(int, (index, this_len, query_len))
+    return int(index), int(this_len), int(query_len)
 
 
 def _parse_seq_header(line):
@@ -429,7 +460,7 @@ def realign_seqs(block, gap_char=".", align_indels=False):
 
 def consensus2block(
     record, level=0, name=None, molseq=None, params=None, query_chars=None
-):
+) -> Block:
     """Convert a Biopython SeqRecord to a cma block.
 
     Ungapping is handled here.
@@ -459,7 +490,7 @@ def consensus2block(
     )
 
 
-def seqrecord2sequence(record, qlen, index, molseq=None, head_extra=""):
+def seqrecord2sequence(record, qlen, index, molseq=None, head_extra="") -> Sequence:
     """Convert a Biopython SeqRecord to a cma sequence record.
 
     Indels (gaps, casing) must have already been handled in the record or, if
@@ -520,7 +551,7 @@ def replace_asterisks(seq, label=None):
     return str(seq).replace("*", "X")
 
 
-def collapse_to_consensus(seqrecords, strict=False, do_iron=True):
+def collapse_to_consensus(seqrecords, strict=False, do_iron=True) -> Block:
     """Opposite of realign_seqs.
 
     Input sequences should all be the same length.
