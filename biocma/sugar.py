@@ -32,11 +32,14 @@ def maybe_open(infile, mode="r"):
     open() accepts; the file it names is closed on leaving the context, also
     on an exception. Anything else is taken to be a handle and left open.
 
-    For writing, a binary mode given a text handle yields the byte stream
-    under it, which Bio.AlignIO needs to write a format such as seqxml to
-    standard output. The text layer is flushed first, since both write to one
-    file. A handle with no byte stream, such as io.StringIO, is yielded as it
-    is.
+    A binary mode given a text handle yields the byte stream under it, which
+    Bio.AlignIO needs to read or write a format such as seqxml through
+    standard input or output. The text layer is flushed first, so that text
+    written through it precedes the bytes. For reading, nothing may have
+    been read through the text layer, which can hold data read ahead from
+    the byte stream that would then be skipped; this cannot be checked on a
+    pipe. A handle with no byte stream, such as io.StringIO, is yielded as
+    it is.
     """
     if isinstance(infile, (str, bytes, os.PathLike)):
         with open(infile, mode) as handle:

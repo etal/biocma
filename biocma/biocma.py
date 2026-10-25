@@ -12,7 +12,10 @@ See:
 
 import contextlib
 import copy
+import io
 import logging
+from xml.etree.ElementTree import ParseError
+from xml.sax import SAXParseException
 
 from Bio import AlignIO, StreamModeError
 from Bio.Align import MultipleSeqAlignment
@@ -49,37 +52,69 @@ def write(msas, outfile, do_iron=True):
 def convert(in_file, in_fmt, out_file, out_fmt):
     """Convert alignments between CMA and a Bio.AlignIO format.
 
-    A format that Biopython writes as bytes, such as seqxml, is written to the
-    byte stream under a text handle, or to a path opened in binary mode. Such
-    a file holds one alignment: Biopython would write a complete document for
-    each, which together are not a valid file, so in these two cases more
-    than one alignment raises ValueError. After that error a path is left
-    empty, since it has already been opened for writing. A binary handle is
-    given to Biopython without this check, and several alignments are then
-    written as one invalid file.
+    A format that Biopython reads or writes as bytes, such as seqxml, is read
+    from or written to the byte stream under a text handle, or a path opened
+    in binary mode. A text handle given for such input must not have been
+    read from, since its text layer may hold data read ahead from the byte
+    stream. A file in such a format holds one alignment: Biopython would
+    write a complete document for each, which together are not a valid file,
+    so more than one alignment raises ValueError before the output is opened.
+    Malformed input in an XML format raises ValueError, as it does in other
+    formats.
     """
-    records = list(
-        parse(in_file) if in_fmt == "cma" else AlignIO.parse(in_file, in_fmt)
-    )
+    if in_fmt == "cma":
+        records = list(parse(in_file))
+    else:
+        records = _read_alignments(in_file, in_fmt)
     if out_fmt == "cma":
         write(records, out_file)
-        return
-    try:
-        AlignIO.write(records, out_file, out_fmt)
-    except StreamModeError:
-        # Biopython checks the handle's mode before it writes anything, so the
-        # write can be repeated on a binary handle
+    elif _writes_bytes(out_fmt):
+        if len(records) > 1:
+            raise ValueError(
+                f"A {out_fmt} file holds one alignment; the input has {len(records)}"
+            )
         with sugar.maybe_open(out_file, "wb") as stream:
-            if stream is out_file:
-                # No byte stream to retry on, or a binary handle given a text
-                # format: the error is Biopython's to report
-                raise
-            if len(records) > 1:
-                raise ValueError(
-                    f"A {out_fmt} file holds one alignment; "
-                    f"the input has {len(records)}"
-                ) from None
             AlignIO.write(records, stream, out_fmt)
+    else:
+        AlignIO.write(records, out_file, out_fmt)
+
+
+def _writes_bytes(fmt):
+    """Return whether Bio.AlignIO writes fmt as bytes rather than text.
+
+    Biopython checks the handle's mode when it constructs a writer, before
+    the writer looks at any alignment, so an empty alignment written to a
+    throwaway text handle raises StreamModeError for exactly these formats.
+    Text formats either accept the empty alignment or reject it with another
+    ValueError, as does an unknown format, which the real write reports.
+    The probe uses a throwaway handle, rather than a first attempt on the
+    output as for input, because Bio.AlignIO opens a path in text mode, and
+    so truncates it, before it checks the mode.
+    """
+    try:
+        AlignIO.write([MultipleSeqAlignment([])], io.StringIO(), fmt)
+    except StreamModeError:
+        return True
+    except ValueError:
+        pass
+    return False
+
+
+def _read_alignments(in_file, fmt):
+    """Read the alignments in a Bio.AlignIO format into a list."""
+    try:
+        try:
+            return list(AlignIO.parse(in_file, fmt))
+        except StreamModeError:
+            # Biopython checks the handle's mode before it reads anything, so
+            # the read can be repeated on a binary handle; a binary handle
+            # given a text format raises the same error again
+            with sugar.maybe_open(in_file, "rb") as stream:
+                return list(AlignIO.parse(stream, fmt))
+    except (SAXParseException, ParseError) as exc:
+        # The SeqXML and UniProt XML parsers raise these, which are not
+        # ValueError
+        raise ValueError(f"Malformed {fmt} input: {exc}") from exc
 
 
 class ChainMultiAlignment(MultipleSeqAlignment):

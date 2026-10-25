@@ -9,7 +9,7 @@ import sys
 import pytest
 from Bio import AlignIO
 
-from biocma import cli, cma
+from biocma import biocma, cli, cma
 
 COMMANDS = [
     ("cma-blocks", cli.blocks_main, []),
@@ -188,6 +188,26 @@ def test_convert_refuses_several_alignments_in_binary_format(aaaplus_sma, capsys
     out, err = capsys.readouterr()
     assert out == ""
     assert err.startswith("cma-convert: error: A seqxml file holds one alignment")
+
+
+def test_convert_from_binary_format_on_stdin(fikk_cma, tmp_path, monkeypatch, capsys):
+    # Biopython reads seqxml only from a binary handle, here sys.stdin.buffer
+    xml = tmp_path / "fikk.xml"
+    biocma.convert(fikk_cma, "cma", xml, "seqxml")
+    monkeypatch.setattr(sys, "stdin", io.TextIOWrapper(io.BytesIO(xml.read_bytes())))
+    assert cli.convert_main(["-i", "seqxml", "-"]) == 0
+    converted = cma.read(io.StringIO(capsys.readouterr().out))
+    assert [seq["id"] for seq in converted["sequences"]] == [
+        seq["id"] for seq in cma.read(fikk_cma)["sequences"]
+    ]
+
+
+def test_convert_reports_malformed_binary_input(fikk_cma, capsys):
+    # The SeqXML parser raises SAXParseException, which is not a ValueError
+    assert cli.convert_main(["-i", "seqxml", fikk_cma]) == 1
+    out, err = capsys.readouterr()
+    assert out == ""
+    assert err.startswith("cma-convert: error: Malformed seqxml input: ")
 
 
 @pytest.mark.parametrize("option", ["-o", "-i"])

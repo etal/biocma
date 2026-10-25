@@ -531,8 +531,10 @@ def seqrecord2sequence(record, qlen, index, molseq=None, head_extra="") -> Seque
     The flank lengths, flank sequences and taxonomy that
     ChainMultiAlignment.from_block stores in the record's annotations are
     kept; a record without them, or with None for them, has empty flanks and
-    no taxonomy. The `length` field counts the residues in the flank
-    sequences as well as in `molseq`.
+    no taxonomy. Each may also be a one-element list of strings, as Bio.SeqIO
+    reads them back from SeqXML; a list of any other length is taken as
+    absent. The `length` field counts the residues in the flank sequences as
+    well as in `molseq`.
 
     `head_extra`: residues of the record that precede its aligned region but
     are not in `molseq`. They are counted in the head flank length, and are
@@ -546,24 +548,37 @@ def seqrecord2sequence(record, qlen, index, molseq=None, head_extra="") -> Seque
     else:
         description = record.description
     annotations = record.annotations
-    head_seq = annotations.get("head_seq") or ""
+    head_seq = _annotation(annotations, "head_seq") or ""
     if head_seq:
         head_seq += head_extra
-    tail_seq = annotations.get("tail_seq") or ""
+    tail_seq = _annotation(annotations, "tail_seq") or ""
     return dict(
         index=index,
         id=record.id,
         description=description or " ",
         dbxrefs={},
-        phylum=annotations.get("phylum") or "",
-        taxchar=annotations.get("taxchar") or "",
-        head_len=(annotations.get("head_len") or 0) + len(head_extra),
-        tail_len=annotations.get("tail_len") or 0,
+        phylum=_annotation(annotations, "phylum") or "",
+        taxchar=_annotation(annotations, "taxchar") or "",
+        head_len=int(_annotation(annotations, "head_len") or 0) + len(head_extra),
+        tail_len=int(_annotation(annotations, "tail_len") or 0),
         head_seq=head_seq,
         tail_seq=tail_seq,
         length=len(head_seq) + len(molseq) - molseq.count("-") + len(tail_seq),
         seq=molseq,
     )
+
+
+def _annotation(annotations, key):
+    """Return one annotation value, unwrapping a one-element list.
+
+    Bio.SeqIO's SeqXML reader returns each record property as a list of
+    strings, so a value that biocma wrote as 888 is read back as ['888'].
+    A list of any other length is taken as absent.
+    """
+    value = annotations.get(key)
+    if isinstance(value, list):
+        value = value[0] if len(value) == 1 else None
+    return value
 
 
 def replace_asterisks(seq, label=None):

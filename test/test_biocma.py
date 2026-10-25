@@ -65,24 +65,61 @@ def test_convert_writes_binary_format_to_path(fikk_cma, tmp_path):
     assert len(AlignIO.read(io.BytesIO(out.read_bytes()), "seqxml")) == 24
 
 
+def test_convert_reads_binary_format(fikk_cma, tmp_path):
+    # Bio.AlignIO opens a path in text mode, which seqxml rejects; Bio.SeqIO
+    # reads the CMA fields back as one-element lists of strings
+    xml = tmp_path / "fikk.xml"
+    biocma.convert(fikk_cma, "cma", xml, "seqxml")
+    out = io.StringIO()
+    biocma.convert(xml, "seqxml", out, "cma")
+    out.seek(0)
+    expect = cma.read(io.StringIO(write_to_str([biocma.read(fikk_cma)])))
+    assert cma.read(out)["sequences"] == expect["sequences"]
+
+
+@pytest.mark.parametrize("fmt", ["seqxml", "uniprot-xml"])
+@pytest.mark.parametrize("as_path", [False, True], ids=["handle", "path"])
+def test_convert_reports_malformed_xml_input(fmt, as_path, tmp_path):
+    # Biopython's XML parsers raise exceptions that are not ValueError. The
+    # seqXML root lets the SeqXML reader reach the truncation, where its SAX
+    # parser fails; a different root is reported by the reader as ValueError
+    path = tmp_path / "truncated.xml"
+    path.write_bytes(b'<?xml version="1.0"?>\n<seqXML seqXMLversion="0.4"><entry')
+    in_file = path if as_path else io.BytesIO(path.read_bytes())
+    with pytest.raises(ValueError, match=f"Malformed {fmt} input: "):
+        biocma.convert(in_file, fmt, io.StringIO(), "cma")
+
+
 def test_convert_refuses_several_alignments_in_binary_format(aaaplus_sma, tmp_path):
     out = tmp_path / "out.xml"
     out.write_text("earlier content")
     with pytest.raises(ValueError, match="A seqxml file holds one alignment"):
         biocma.convert(aaaplus_sma, "cma", out, "seqxml")
-    # The path was opened for writing before the alignments were counted
-    assert out.read_bytes() == b""
+    # Refused before the path was opened for writing
+    assert out.read_text() == "earlier content"
+
+
+def test_convert_refuses_several_alignments_to_binary_handle(aaaplus_sma):
+    # Biopython accepts a binary handle without error, and would write one
+    # seqxml document for each block
+    handle = io.BytesIO()
+    with pytest.raises(ValueError, match="A seqxml file holds one alignment"):
+        biocma.convert(aaaplus_sma, "cma", handle, "seqxml")
+    assert handle.getvalue() == b""
 
 
 @pytest.mark.parametrize(
-    "handle_type, out_fmt", [(io.StringIO, "seqxml"), (io.BytesIO, "fasta")]
+    "handle_type, fmt", [(io.StringIO, "seqxml"), (io.BytesIO, "fasta")]
 )
-def test_convert_reports_handle_of_wrong_mode(handle_type, out_fmt, aaaplus_sma):
-    # Biopython's StreamModeError, also for several alignments, rather than
-    # the one-alignment ValueError or, for a handle without a byte stream,
-    # AttributeError
+@pytest.mark.parametrize("direction", ["input", "output"])
+def test_convert_reports_handle_of_wrong_mode(direction, handle_type, fmt, fikk_cma):
+    # Biopython's StreamModeError, also where the handle has no byte stream
+    # to repeat the read or write on
     with pytest.raises(StreamModeError):
-        biocma.convert(aaaplus_sma, "cma", handle_type(), out_fmt)
+        if direction == "output":
+            biocma.convert(fikk_cma, "cma", handle_type(), fmt)
+        else:
+            biocma.convert(handle_type(), fmt, io.StringIO(), "cma")
 
 
 def test_alignment_reads_dots_as_gaps(fikk_cma):

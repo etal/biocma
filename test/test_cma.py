@@ -309,11 +309,33 @@ def test_collapse_moves_leading_residues_to_head_flank():
     ] == [(2, "", "ACD", 3), (7, "", "A-D", 2), (3, "PQK", "ACD", 6)]
 
 
-def test_seqrecord2sequence_treats_none_annotations_as_absent():
+@pytest.mark.parametrize("value", [None, [], ["1", "2"]])
+def test_seqrecord2sequence_treats_unusable_annotations_as_absent(value):
     keys = ("head_len", "tail_len", "head_seq", "tail_seq", "phylum", "taxchar")
-    record = SeqRecord(Seq("ACD"), id="r1", annotations=dict.fromkeys(keys))
+    record = SeqRecord(Seq("ACD"), id="r1", annotations=dict.fromkeys(keys, value))
     seq = cma.seqrecord2sequence(record, 3, 1)
     assert [seq[key] for key in keys] == [0, 0, "", "", "", ""]
+    assert seq["length"] == 3
+
+
+def test_seqrecord2sequence_unwraps_seqxml_annotations():
+    # Bio.SeqIO reads each SeqXML property back as a list of strings
+    record = SeqRecord(
+        Seq("ACD"),
+        id="r1",
+        annotations=dict(
+            head_len=["2"],
+            tail_len=["0"],
+            head_seq=["MK"],
+            tail_seq=[""],
+            phylum=["Apicomplexa"],
+            taxchar=["A"],
+        ),
+    )
+    seq = cma.seqrecord2sequence(record, 3, 1, head_extra="G")
+    fields = ("head_len", "tail_len", "head_seq", "tail_seq", "phylum", "taxchar")
+    assert [seq[key] for key in fields] == [3, 0, "MKG", "", "Apicomplexa", "A"]
+    assert seq["length"] == 6
 
 
 def test_realign_seqs_of_empty_block():
