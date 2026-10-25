@@ -94,7 +94,7 @@ class ChainMultiAlignment(MultipleSeqAlignment):
         query_length=None,
         query_chars=None,
     ):
-        MultipleSeqAlignment.__init__(self, records)
+        super().__init__(records)
         self.level = level
         self.name = name
         self.params = params
@@ -130,10 +130,9 @@ class ChainMultiAlignment(MultipleSeqAlignment):
         )
         return cls(
             records,
-            # CMA attributes
-            block["level"],
-            block["name"],
-            block["params"],
-            block["query_length"],
-            block["query_chars"],
+            level=block["level"],
+            name=block["name"],
+            params=block["params"],
+            query_length=block["query_length"],
+            query_chars=block["query_chars"],
         )
