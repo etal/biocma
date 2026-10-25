@@ -11,6 +11,7 @@ See:
 # column positions -- use for conservation & pattern info
 
 import contextlib
+import copy
 import logging
 
 from Bio import AlignIO, StreamModeError
@@ -136,3 +137,37 @@ class ChainMultiAlignment(MultipleSeqAlignment):
             query_length=block["query_length"],
             query_chars=block["query_chars"],
         )
+
+    def _dots_as_dashes(self):
+        """Copy this alignment as a MultipleSeqAlignment with '-' for '.'.
+
+        Biopython reads only '-' as a gap, so the insert gaps that from_block
+        writes as '.' would otherwise count as residues. The records are deep
+        copies, since Biopython's conversion empties the letter annotations of
+        a shallow copy in place, and so those of this alignment's records.
+        """
+        records = []
+        for record in self:
+            record = copy.deepcopy(record)
+            record.seq = Seq(str(record.seq).replace(".", "-"))
+            records.append(record)
+        return MultipleSeqAlignment(
+            records,
+            annotations=self.annotations,
+            column_annotations=self.column_annotations,
+        )
+
+    @property
+    def alignment(self):
+        """Return a Bio.Align.Alignment, reading '.' as a gap character.
+
+        A column with a gap in every record is dropped by Biopython's
+        conversion, so the result can have fewer columns than
+        get_alignment_length().
+        """
+        return self._dots_as_dashes().alignment
+
+    @property
+    def substitutions(self):
+        """Return the substitution counts, reading '.' as a gap character."""
+        return self._dots_as_dashes().substitutions

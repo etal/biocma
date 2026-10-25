@@ -85,6 +85,25 @@ def test_convert_reports_handle_of_wrong_mode(handle_type, out_fmt, aaaplus_sma)
         biocma.convert(aaaplus_sma, "cma", handle_type(), out_fmt)
 
 
+def test_alignment_reads_dots_as_gaps(fikk_cma):
+    aln = biocma.read(fikk_cma)
+    rows = [str(rec.seq) for rec in aln]
+    alignment = aln.alignment
+    assert [str(rec.seq) for rec in alignment.sequences] == [
+        row.replace("-", "").replace(".", "") for row in rows
+    ]
+    assert "." not in aln.substitutions.alphabet
+    # The records of the ChainMultiAlignment keep their '.' gaps
+    assert [str(rec.seq) for rec in aln] == rows
+
+
+def test_alignment_leaves_letter_annotations_of_records():
+    record = SeqRecord(Seq("AB.D"), id="a", letter_annotations={"q": [1, 2, 3, 4]})
+    aln = biocma.ChainMultiAlignment([record, SeqRecord(Seq("ABcD"), id="b")])
+    assert aln.alignment.sequences[0].letter_annotations == {"q": [1, 2, 4]}
+    assert record.letter_annotations == {"q": [1, 2, 3, 4]}
+
+
 def test_round_trip_preserves_ids_and_residues(fikk_cma):
     aln = biocma.read(fikk_cma)
     again = biocma.read(io.StringIO(write_to_str([aln])))
