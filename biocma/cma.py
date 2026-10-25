@@ -454,16 +454,26 @@ def seqrecord2sequence(record, qlen, index, molseq=None):
 
     Indels (gaps, casing) must have already been handled in the record or, if
     given, in `molseq`, a string used in place of the record's own sequence.
+
+    A record read by Bio.SeqIO from FASTA has a description that begins with
+    its ID, while a record read from CMA has one without it. As in Biopython's
+    FASTA writer, the first word of the description is removed only when it
+    equals the record's ID, so a CMA description that happens to begin with
+    its own ID loses that word. An empty remainder, as from a Clustal record
+    whose description is its ID, is written as a single space, which keeps
+    the header bytes of earlier releases.
     """
     if molseq is None:
         molseq = str(record.seq)
-    description = (
-        record.description.split(" ", 1)[1] if " " in record.description else " "
-    )
+    words = record.description.split(None, 1)
+    if words and words[0] == record.id:
+        description = words[1] if len(words) > 1 else ""
+    else:
+        description = record.description
     return dict(
         index=index,
         id=record.id,
-        description=description,
+        description=description or " ",
         dbxrefs={},
         phylum="",
         taxchar="",

@@ -7,6 +7,8 @@ import logging
 from pathlib import Path
 
 import pytest
+from Bio.Seq import Seq
+from Bio.SeqRecord import SeqRecord
 
 from biocma import cma
 
@@ -254,6 +256,34 @@ def test_write_does_not_modify_blocks(aaaplus_sma):
     first = write_to_str(blocks)
     assert blocks == before
     assert write_to_str(blocks) == first
+
+
+@pytest.mark.parametrize(
+    "rec_id, description, expect",
+    [
+        # Read from CMA: the description does not begin with the ID
+        ("psu|X", "| organism=Plasmodium", "| organism=Plasmodium"),
+        ("FIKK", "consensus", "consensus"),
+        ("abc", "abcdef", "abcdef"),
+        # Read by Bio.SeqIO from FASTA: the description begins with the ID
+        ("abc", "abc rest of it", "rest of it"),
+        ("abc", "abc\trest", "rest"),
+        # Read by Bio.AlignIO from Clustal: the description is the ID
+        ("abc", "abc", " "),
+        # No description at all
+        ("abc", "", " "),
+    ],
+)
+def test_seqrecord2sequence_description(rec_id, description, expect):
+    record = SeqRecord(Seq("ACD"), id=rec_id, description=description)
+    assert cma.seqrecord2sequence(record, 3, 1)["description"] == expect
+
+
+def test_id_only_description_writes_two_spaces():
+    # Records read from Clustal keep the header layout of earlier releases,
+    # which the MAPGAPS template fixtures of etal/fammer pin byte for byte
+    block = cma.consensus2block(SeqRecord(Seq("ACD"), id="abc", description="abc"))
+    assert "\n>abc  \n" in write_to_str(block)
 
 
 def test_realign_seqs_of_empty_block():

@@ -12,11 +12,10 @@ from Bio.SeqRecord import SeqRecord
 from biocma import biocma, cma
 
 
-def round_trip(aln):
+def write_to_str(msas):
     buf = io.StringIO()
-    biocma.write([aln], buf)
-    buf.seek(0)
-    return biocma.read(buf)
+    biocma.write(msas, buf)
+    return buf.getvalue()
 
 
 def ungapped(aln):
@@ -56,27 +55,30 @@ def test_export_to_genbank(fikk_cma):
 
 def test_round_trip_preserves_ids_and_residues(fikk_cma):
     aln = biocma.read(fikk_cma)
-    again = round_trip(aln)
+    again = biocma.read(io.StringIO(write_to_str([aln])))
     assert [rec.id for rec in again] == [rec.id for rec in aln]
     assert ungapped(again) == ungapped(aln)
 
 
-def test_round_trip_is_stable_after_first_pass(fikk_cma):
-    # The fixture's consensus row has inserts and deletions, which the first
-    # write collapses, so only later passes reproduce the aligned sequences.
-    first = round_trip(biocma.read(fikk_cma))
-    second = round_trip(first)
-    assert [str(rec.seq) for rec in second] == [str(rec.seq) for rec in first]
+@pytest.mark.parametrize("fixture", ["fikk_cma", "aaaplus_sma"])
+def test_write_is_stable_after_first_pass(fixture, request):
+    # The first write collapses inserts and deletions in consensus rows, so
+    # only later passes reproduce the written text.
+    first = write_to_str(biocma.parse(request.getfixturevalue(fixture)))
+    second = write_to_str(biocma.parse(io.StringIO(first)))
+    assert second == first
+
+
+def test_write_keeps_descriptions(fikk_cma):
+    text = write_to_str([biocma.read(fikk_cma)])
+    assert "\n>FIKK consensus\n" in text
+    assert "\n>psu|MAL7P1.127 | organism=Plasmodium_falciparum_3D7 | " in text
 
 
 def test_write_does_not_modify_alignment(fikk_cma):
     aln = biocma.read(fikk_cma)
     before = [(rec.id, str(rec.seq)) for rec in aln]
-    outputs = []
-    for _ in range(2):
-        buf = io.StringIO()
-        biocma.write([aln], buf)
-        outputs.append(buf.getvalue())
+    outputs = [write_to_str([aln]) for _ in range(2)]
     assert [(rec.id, str(rec.seq)) for rec in aln] == before
     assert outputs[0] == outputs[1]
 
@@ -87,7 +89,5 @@ def test_write_irons_indels_by_default():
     aln = MultipleSeqAlignment(
         [SeqRecord(Seq("AB.CDE"), id="cons"), SeqRecord(Seq("A-xC-E"), id="r1")]
     )
-    buf = io.StringIO()
-    biocma.write([aln], buf)
-    block = cma.read(io.StringIO(buf.getvalue()))
+    block = cma.read(io.StringIO(write_to_str([aln])))
     assert [seq["seq"] for seq in block["sequences"]] == ["ABCDE", "AXC-E"]
