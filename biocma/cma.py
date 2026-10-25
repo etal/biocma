@@ -439,12 +439,32 @@ def realign_seqs(block, gap_char=".", align_indels=False):
     the gaps back to obtain a normal alignment.
 
     `return`: a list of realigned sequence strings, empty for a block without
-    sequences.
+    sequences. Raise ValueError if the sequences differ in their number of
+    aligned (non-insert) characters, since no added gaps can line such rows
+    up.
     """
     # ENH: align inserts using an external tool (if align_indels)
     all_chars = [list(sq["seq"]) for sq in block["sequences"]]
     if not all_chars:
         return []
+    naligned = sum(not c.islower() for c in all_chars[0])
+    for sq, row in zip(block["sequences"], all_chars, strict=True):
+        count = sum(not c.islower() for c in row)
+        if count != naligned:
+            raise ValueError(
+                f"Sequence {sq['id']} has {count} aligned characters, "
+                f"the first sequence has {naligned}"
+            )
+    # Set aside each row's trailing insert run: the loop below stops at the
+    # end of the first row, and no aligned column follows the run to place the
+    # other rows' gaps before
+    tails = []
+    for row in all_chars:
+        cut = len(row)
+        while cut and row[cut - 1].islower():
+            cut -= 1
+        tails.append("".join(row[cut:]))
+        del row[cut:]
     # NB: If speed is an issue here, consider Numpy or Cython
     #   main problem: list.insert is O(n) -- would OrderedDict help?
     nrows = len(all_chars)
@@ -455,7 +475,11 @@ def realign_seqs(block, gap_char=".", align_indels=False):
             for row in rows_need_gaps:
                 row.insert(i, gap_char)
         i += 1
-    return ["".join(row) for row in all_chars]
+    width = max(map(len, tails))
+    return [
+        "".join(row) + tail + gap_char * (width - len(tail))
+        for row, tail in zip(all_chars, tails, strict=True)
+    ]
 
 
 def consensus2block(
@@ -561,7 +585,9 @@ def collapse_to_consensus(seqrecords, strict=False, do_iron=True) -> Block:
     The block takes its level, name, params and query_chars from attributes
     of `seqrecords` where it has them, as a ChainMultiAlignment does. The
     residues of a record that precede the first consensus column are removed
-    from its sequence and counted in its head flank.
+    from its sequence and counted in its head flank; those that follow the
+    last consensus column stay in its sequence as a trailing insert, rather
+    than in its tail flank.
     """
     level = getattr(seqrecords, "level", 0)
     name = getattr(seqrecords, "name", None)

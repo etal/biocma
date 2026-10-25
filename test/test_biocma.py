@@ -104,6 +104,18 @@ def test_alignment_leaves_letter_annotations_of_records():
     assert record.letter_annotations == {"q": [1, 2, 3, 4]}
 
 
+def test_read_back_residues_past_last_consensus_column():
+    # The write keeps the residues as a trailing insert of the second record
+    records = [
+        SeqRecord(Seq("ABCDE..."), id="cons"),
+        SeqRecord(Seq("ABCDEfgh"), id="longer"),
+        SeqRecord(Seq("ABCDE---"), id="short"),
+    ]
+    text = write_to_str([biocma.ChainMultiAlignment(records, name="t")])
+    aln = biocma.read(io.StringIO(text))
+    assert [str(rec.seq) for rec in aln] == ["ABCDE...", "ABCDEfgh", "ABCDE..."]
+
+
 def test_round_trip_preserves_ids_and_residues(fikk_cma):
     aln = biocma.read(fikk_cma)
     again = biocma.read(io.StringIO(write_to_str([aln])))

@@ -320,6 +320,25 @@ def test_realign_seqs_of_empty_block():
     assert cma.realign_seqs({"sequences": []}) == []
 
 
+def test_realign_seqs_pads_trailing_inserts():
+    # Inserts before the first, between and after the last aligned residues
+    block = {
+        "sequences": [
+            {"id": "cons", "seq": "ABC"},
+            {"id": "tail", "seq": "ABCde"},
+            {"id": "head", "seq": "aABC"},
+            {"id": "inner", "seq": "ABcC"},
+        ]
+    }
+    assert cma.realign_seqs(block) == [".AB.C..", ".AB.Cde", "aAB.C..", ".ABcC.."]
+
+
+def test_realign_seqs_rejects_unequal_aligned_lengths():
+    block = {"sequences": [{"id": "a", "seq": "ABC"}, {"id": "b", "seq": "ABc"}]}
+    with pytest.raises(ValueError, match="Sequence b has 2 aligned characters"):
+        cma.realign_seqs(block)
+
+
 def test_iron():
     assert cma.iron("AAAAbc--de-f--gAAA") == "AAAABCDEFgAAA"
     seq = (
