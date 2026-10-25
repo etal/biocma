@@ -28,7 +28,7 @@ def test_read(fikk_cma):
     assert len(aln) == 24
     assert aln[0].id == "FIKK"
     assert (aln.level, aln.name, aln.query_length) == (0, "FIKK", 255)
-    assert aln[1].dbxrefs == ["MAL7P1.127"]
+    assert aln[1].dbxrefs == ["psu:MAL7P1.127"]
 
 
 def test_parse_skips_block_without_sequences(aaaplus_sma, caplog):
@@ -51,6 +51,11 @@ def test_read_rejects_file_without_sequences(fikk_cma):
 def test_export_to_genbank(fikk_cma):
     # The GenBank writer requires molecule_type in each record's annotations
     AlignIO.write(biocma.read(fikk_cma), io.StringIO(), "genbank")
+
+
+def test_export_to_seqxml(fikk_cma):
+    # The SeqXML writer requires each cross-reference in 'source:id' form
+    AlignIO.write(biocma.read(fikk_cma), io.BytesIO(), "seqxml")
 
 
 def test_round_trip_preserves_ids_and_residues(fikk_cma):

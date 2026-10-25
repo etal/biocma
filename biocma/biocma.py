@@ -84,7 +84,7 @@ class ChainMultiAlignment(MultipleSeqAlignment):
                 Seq(rseq),
                 id=bseq["id"],
                 description=bseq["description"],
-                dbxrefs=list(bseq["dbxrefs"].values()),
+                dbxrefs=[f"{key}:{value}" for key, value in bseq["dbxrefs"].items()],
                 annotations=dict(
                     # NB: always protein; X is OK
                     molecule_type="protein",
