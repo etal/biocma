@@ -72,7 +72,54 @@ def test_write_is_stable_after_first_pass(fixture, request):
 def test_write_keeps_descriptions(fikk_cma):
     text = write_to_str([biocma.read(fikk_cma)])
     assert "\n>FIKK consensus\n" in text
-    assert "\n>psu|MAL7P1.127 | organism=Plasmodium_falciparum_3D7 | " in text
+    assert (
+        "\n>psu|MAL7P1.127 {|888(935)|}| organism=Plasmodium_falciparum_3D7 | " in text
+    )
+
+
+@pytest.mark.parametrize("fixture", ["fikk_cma", "aaaplus_sma"])
+def test_write_keeps_cma_fields(fixture, request):
+    fields = (
+        "id",
+        "length",
+        "head_len",
+        "tail_len",
+        "head_seq",
+        "tail_seq",
+        "phylum",
+        "taxchar",
+    )
+    path = request.getfixturevalue(fixture)
+    original = [block for block in cma.parse(path) if block["sequences"]]
+    written = list(cma.parse(io.StringIO(write_to_str(biocma.parse(path)))))
+    assert [block["params"] for block in written] == [
+        block["params"] for block in original
+    ]
+    assert [
+        [tuple(seq[f] for f in fields) for seq in block["sequences"]]
+        for block in written
+    ] == [
+        [tuple(seq[f] for f in fields) for seq in block["sequences"]]
+        for block in original
+    ]
+
+
+@pytest.mark.parametrize(
+    "query_chars, expect",
+    [("!**", "!**"), ("!***", "***")],
+    ids=["kept", "wrong-length"],
+)
+def test_write_keeps_block_params(query_chars, expect):
+    aln = biocma.ChainMultiAlignment(
+        [SeqRecord(Seq("ACD"), id="cons"), SeqRecord(Seq("AC-"), id="r1")],
+        params="go=19,gx=2,pn=5.0,lf=0,rf=0",
+        query_chars=query_chars,
+    )
+    block = cma.read(io.StringIO(write_to_str([aln])))
+    assert (block["params"], block["query_chars"]) == (
+        "go=19,gx=2,pn=5.0,lf=0,rf=0",
+        expect,
+    )
 
 
 def test_write_does_not_modify_alignment(fikk_cma):

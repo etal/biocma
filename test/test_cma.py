@@ -7,6 +7,7 @@ import logging
 from pathlib import Path
 
 import pytest
+from Bio.Align import MultipleSeqAlignment
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 
@@ -284,6 +285,35 @@ def test_id_only_description_writes_two_spaces():
     # which the MAPGAPS template fixtures of etal/fammer pin byte for byte
     block = cma.consensus2block(SeqRecord(Seq("ACD"), id="abc", description="abc"))
     assert "\n>abc  \n" in write_to_str(block)
+
+
+def test_collapse_moves_leading_residues_to_head_flank():
+    # Residues before the first consensus column extend the head flank: its
+    # length always, its sequence only where the record has one. The length
+    # field counts only residues in the flank and aligned sequences, so the
+    # moved residues add to it only for the record with a head flank sequence.
+    aln = MultipleSeqAlignment(
+        [
+            SeqRecord(Seq("--ACD"), id="cons"),
+            SeqRecord(Seq("MKACD"), id="plain"),
+            SeqRecord(Seq("MKA-D"), id="lengths", annotations={"head_len": 5}),
+            SeqRecord(
+                Seq("-KACD"), id="flank", annotations={"head_len": 2, "head_seq": "PQ"}
+            ),
+        ]
+    )
+    block = cma.collapse_to_consensus(aln)
+    assert [
+        (seq["head_len"], seq["head_seq"], seq["seq"], seq["length"])
+        for seq in block["sequences"][1:]
+    ] == [(2, "", "ACD", 3), (7, "", "A-D", 2), (3, "PQK", "ACD", 6)]
+
+
+def test_seqrecord2sequence_treats_none_annotations_as_absent():
+    keys = ("head_len", "tail_len", "head_seq", "tail_seq", "phylum", "taxchar")
+    record = SeqRecord(Seq("ACD"), id="r1", annotations=dict.fromkeys(keys))
+    seq = cma.seqrecord2sequence(record, 3, 1)
+    assert [seq[key] for key in keys] == [0, 0, "", "", "", ""]
 
 
 def test_realign_seqs_of_empty_block():

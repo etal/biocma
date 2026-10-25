@@ -1,7 +1,6 @@
 """Tests for utility functions (biocma.utils)."""
 
 import copy
-import io
 
 import pytest
 from Bio import SeqIO
@@ -61,20 +60,20 @@ def test_get_inserts(fikk_cma, fikk_fasta):
         assert [ins.lower() for ins in ins_ranges] == targets
 
 
-def test_position_functions_on_collapsed_block(fikk_cma):
-    # A block built from Biopython records numbers its residues as the CMA
-    # text written from it does
-    block = cma.collapse_to_consensus(biocma.read(fikk_cma))
-    buf = io.StringIO()
-    cma.write(block, buf)
-    written = cma.read(io.StringIO(buf.getvalue()))
-    assert utils.get_inserts(block) == utils.get_inserts(written)
-    assert utils.get_equivalent_positions(block) == utils.get_equivalent_positions(
-        written
-    )
-    assert [utils.number_letters(rec) for rec in block["sequences"]] == [
-        utils.number_letters(rec) for rec in written["sequences"]
-    ]
+@pytest.mark.parametrize("fixture", ["fikk_cma", "aaaplus_sma"])
+def test_collapse_keeps_residue_numbers(fixture, request):
+    # Collapsing changes the case of residues and the gaps between them, but
+    # not the number of any residue
+    def numbered(rec):
+        return {posn: res.upper() for posn, res in utils.number_letters(rec).items()}
+
+    path = request.getfixturevalue(fixture)
+    original = [block for block in cma.parse(path) if block["sequences"]]
+    for block, aln in zip(original, biocma.parse(path), strict=True):
+        collapsed = cma.collapse_to_consensus(aln)
+        assert [numbered(rec) for rec in collapsed["sequences"]] == [
+            numbered(rec) for rec in block["sequences"]
+        ]
 
 
 def test_get_consensus_numbers_from_one():

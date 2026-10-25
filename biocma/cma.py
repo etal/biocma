@@ -427,29 +427,39 @@ def realign_seqs(block, gap_char=".", align_indels=False):
     return ["".join(row) for row in all_chars]
 
 
-def consensus2block(record, level=0, name=None, molseq=None):
+def consensus2block(
+    record, level=0, name=None, molseq=None, params=None, query_chars=None
+):
     """Convert a Biopython SeqRecord to a cma block.
 
     Ungapping is handled here.
 
     `molseq`: if given, a string used in place of the record's own sequence.
     The record is not modified.
+
+    `params`, `query_chars`: block values to keep, as a ChainMultiAlignment
+    holds them. Without `params` the block gets the parameters of MAPGAPS's
+    fa2cma; `query_chars` is kept only if its length equals the number of
+    residues in the consensus, and is otherwise all '*'.
     """
     if molseq is None:
         molseq = str(record.seq)
     cons_ungap = molseq.replace("-", "").replace(".", "").upper()
+    qlen = len(cons_ungap)
+    if not query_chars or len(query_chars) != qlen:
+        query_chars = "*" * qlen
     return dict(
         level=level,
         one=1,
         name=name or record.id,
-        params="go=10000,gx=2000,pn=1000.0,lf=0,rf=0",
-        query_length=len(cons_ungap),
-        query_chars="*" * len(cons_ungap),
-        sequences=[seqrecord2sequence(record, len(cons_ungap), 1, molseq=cons_ungap)],
+        params=params or "go=10000,gx=2000,pn=1000.0,lf=0,rf=0",
+        query_length=qlen,
+        query_chars=query_chars,
+        sequences=[seqrecord2sequence(record, qlen, 1, molseq=cons_ungap)],
     )
 
 
-def seqrecord2sequence(record, qlen, index, molseq=None):
+def seqrecord2sequence(record, qlen, index, molseq=None, head_extra=""):
     """Convert a Biopython SeqRecord to a cma sequence record.
 
     Indels (gaps, casing) must have already been handled in the record or, if
@@ -462,6 +472,16 @@ def seqrecord2sequence(record, qlen, index, molseq=None):
     its own ID loses that word. An empty remainder, as from a Clustal record
     whose description is its ID, is written as a single space, which keeps
     the header bytes of earlier releases.
+
+    The flank lengths, flank sequences and taxonomy that
+    ChainMultiAlignment.from_block stores in the record's annotations are
+    kept; a record without them, or with None for them, has empty flanks and
+    no taxonomy. The `length` field counts the residues in the flank
+    sequences as well as in `molseq`.
+
+    `head_extra`: residues of the record that precede its aligned region but
+    are not in `molseq`. They are counted in the head flank length, and are
+    appended to the head flank sequence if the record has one.
     """
     if molseq is None:
         molseq = str(record.seq)
@@ -470,18 +490,23 @@ def seqrecord2sequence(record, qlen, index, molseq=None):
         description = words[1] if len(words) > 1 else ""
     else:
         description = record.description
+    annotations = record.annotations
+    head_seq = annotations.get("head_seq") or ""
+    if head_seq:
+        head_seq += head_extra
+    tail_seq = annotations.get("tail_seq") or ""
     return dict(
         index=index,
         id=record.id,
         description=description or " ",
         dbxrefs={},
-        phylum="",
-        taxchar="",
-        head_len=0,
-        tail_len=0,
-        head_seq="",
-        tail_seq="",
-        length=len(molseq) - molseq.count("-"),
+        phylum=annotations.get("phylum") or "",
+        taxchar=annotations.get("taxchar") or "",
+        head_len=(annotations.get("head_len") or 0) + len(head_extra),
+        tail_len=annotations.get("tail_len") or 0,
+        head_seq=head_seq,
+        tail_seq=tail_seq,
+        length=len(head_seq) + len(molseq) - molseq.count("-") + len(tail_seq),
         seq=molseq,
     )
 
@@ -501,9 +526,16 @@ def collapse_to_consensus(seqrecords, strict=False, do_iron=True):
     Input sequences should all be the same length.
 
     The first record must be the consensus.
+
+    The block takes its level, name, params and query_chars from attributes
+    of `seqrecords` where it has them, as a ChainMultiAlignment does. The
+    residues of a record that precede the first consensus column are removed
+    from its sequence and counted in its head flank.
     """
     level = getattr(seqrecords, "level", 0)
     name = getattr(seqrecords, "name", None)
+    params = getattr(seqrecords, "params", None)
+    query_chars = getattr(seqrecords, "query_chars", None)
     # rows is a new list; the caller's input is not modified
     consensus, *rows = seqrecords
     cons_seq = str(consensus.seq)
@@ -536,6 +568,8 @@ def collapse_to_consensus(seqrecords, strict=False, do_iron=True):
         level=level,
         name=name,
         molseq=replace_asterisks(cons_seq, "consensus"),
+        params=params,
+        query_chars=query_chars,
     )
     qlen = block["query_length"]
 
@@ -543,6 +577,7 @@ def collapse_to_consensus(seqrecords, strict=False, do_iron=True):
     for index, rec in enumerate(rows, 2):
         # Collapse rec.seq down to aligned size
         new_mol_seq = []
+        head_extra = []
         is_beginning = True
         for aligned_col, char in zip(
             aligned_cols, replace_asterisks(rec.seq, index), strict=True
@@ -555,15 +590,21 @@ def collapse_to_consensus(seqrecords, strict=False, do_iron=True):
                 else:
                     # aligned character
                     new_mol_seq.append(char.upper())
-            else:
-                # it's an insert or nothing
-                # (also, skip any left-side inserts)
-                if char not in "-." and not is_beginning:
+            elif char not in "-.":
+                # An insert, or a residue before the first consensus column,
+                # which belongs to the head flank
+                if is_beginning:
+                    head_extra.append(char.upper())
+                else:
                     new_mol_seq.append(char.lower())
         molseq = "".join(new_mol_seq)
         if do_iron:
             molseq = iron(molseq)
-        block["sequences"].append(seqrecord2sequence(rec, qlen, index, molseq=molseq))
+        block["sequences"].append(
+            seqrecord2sequence(
+                rec, qlen, index, molseq=molseq, head_extra="".join(head_extra)
+            )
+        )
 
     return block
 
