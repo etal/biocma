@@ -13,7 +13,7 @@ See:
 import contextlib
 import logging
 
-from Bio import AlignIO
+from Bio import AlignIO, StreamModeError
 from Bio.Align import MultipleSeqAlignment
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
@@ -46,13 +46,39 @@ def write(msas, outfile, do_iron=True):
 
 
 def convert(in_file, in_fmt, out_file, out_fmt):
+    """Convert alignments between CMA and a Bio.AlignIO format.
+
+    A format that Biopython writes as bytes, such as seqxml, is written to the
+    byte stream under a text handle, or to a path opened in binary mode. Such
+    a file holds one alignment: Biopython would write a complete document for
+    each, which together are not a valid file, so in these two cases more
+    than one alignment raises ValueError. After that error a path is left
+    empty, since it has already been opened for writing. A binary handle is
+    given to Biopython without this check, and several alignments are then
+    written as one invalid file.
+    """
     records = list(
         parse(in_file) if in_fmt == "cma" else AlignIO.parse(in_file, in_fmt)
     )
     if out_fmt == "cma":
         write(records, out_file)
-    else:
+        return
+    try:
         AlignIO.write(records, out_file, out_fmt)
+    except StreamModeError:
+        # Biopython checks the handle's mode before it writes anything, so the
+        # write can be repeated on a binary handle
+        with sugar.maybe_open(out_file, "wb") as stream:
+            if stream is out_file:
+                # No byte stream to retry on, or a binary handle given a text
+                # format: the error is Biopython's to report
+                raise
+            if len(records) > 1:
+                raise ValueError(
+                    f"A {out_fmt} file holds one alignment; "
+                    f"the input has {len(records)}"
+                ) from None
+            AlignIO.write(records, stream, out_fmt)
 
 
 class ChainMultiAlignment(MultipleSeqAlignment):

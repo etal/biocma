@@ -4,7 +4,7 @@ import io
 import logging
 
 import pytest
-from Bio import AlignIO
+from Bio import AlignIO, StreamModeError
 from Bio.Align import MultipleSeqAlignment
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
@@ -56,6 +56,33 @@ def test_export_to_genbank(fikk_cma):
 def test_export_to_seqxml(fikk_cma):
     # The SeqXML writer requires each cross-reference in 'source:id' form
     AlignIO.write(biocma.read(fikk_cma), io.BytesIO(), "seqxml")
+
+
+def test_convert_writes_binary_format_to_path(fikk_cma, tmp_path):
+    # Bio.AlignIO opens a path in text mode, which seqxml rejects
+    out = tmp_path / "fikk.xml"
+    biocma.convert(fikk_cma, "cma", out, "seqxml")
+    assert len(AlignIO.read(io.BytesIO(out.read_bytes()), "seqxml")) == 24
+
+
+def test_convert_refuses_several_alignments_in_binary_format(aaaplus_sma, tmp_path):
+    out = tmp_path / "out.xml"
+    out.write_text("earlier content")
+    with pytest.raises(ValueError, match="A seqxml file holds one alignment"):
+        biocma.convert(aaaplus_sma, "cma", out, "seqxml")
+    # The path was opened for writing before the alignments were counted
+    assert out.read_bytes() == b""
+
+
+@pytest.mark.parametrize(
+    "handle_type, out_fmt", [(io.StringIO, "seqxml"), (io.BytesIO, "fasta")]
+)
+def test_convert_reports_handle_of_wrong_mode(handle_type, out_fmt, aaaplus_sma):
+    # Biopython's StreamModeError, also for several alignments, rather than
+    # the one-alignment ValueError or, for a handle without a byte stream,
+    # AttributeError
+    with pytest.raises(StreamModeError):
+        biocma.convert(aaaplus_sma, "cma", handle_type(), out_fmt)
 
 
 def test_round_trip_preserves_ids_and_residues(fikk_cma):

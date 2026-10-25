@@ -82,21 +82,30 @@ def test_closed_pipe_exits_quietly(
     assert err in ("", "Dropped 0 duplicate sequences\n")
 
 
-def test_closed_pipe_in_a_real_process(fikk_cma, monkeypatch):
+@pytest.mark.parametrize(
+    "command", [["blocks"], ["convert", "-o", "seqxml"]], ids=["blocks", "seqxml"]
+)
+def test_closed_pipe_in_a_real_process(command, fikk_cma, tmp_path, monkeypatch):
     # Standard output is a pipe whose read end is already closed, so the first
     # write fails; the process exits with status 1 and prints nothing. Output
     # still buffered must not be flushed again at interpreter exit, which
     # would print 'Exception ignored ... BrokenPipeError' and exit with status
     # 120. PYTHONUNBUFFERED would hide that case, so the child runs without it.
+    # Two records keep the output smaller than the buffer, also as seqxml,
+    # which is written to the byte stream under sys.stdout.
+    block = cma.read(fikk_cma)
+    small = tmp_path / "small.cma"
+    cma.write(dict(block, sequences=block["sequences"][:2]), small)
     monkeypatch.delenv("PYTHONUNBUFFERED", raising=False)
     read_end, write_end = os.pipe()
     os.close(read_end)
+    name, *options = command
     script = (
-        "import sys; from biocma import cli; sys.exit(cli.blocks_main(sys.argv[1:]))"
+        f"import sys; from biocma import cli; sys.exit(cli.{name}_main(sys.argv[1:]))"
     )
     with os.fdopen(write_end, "wb") as stdout:
         result = subprocess.run(
-            [sys.executable, "-c", script, fikk_cma],
+            [sys.executable, "-c", script, *options, str(small)],
             stdout=stdout,
             stderr=subprocess.PIPE,
             text=True,
@@ -161,6 +170,24 @@ def test_convert_to_and_from_fasta(fikk_cma, tmp_path, capsys):
     assert cli.convert_main(["-i", "fasta", str(aligned)]) == 0
     converted = cma.read(io.StringIO(capsys.readouterr().out))
     assert [seq["id"] for seq in converted["sequences"]] == ids
+
+
+def test_convert_to_binary_format(fikk_cma, capsysbinary):
+    # Biopython writes seqxml only to a binary handle
+    assert cli.convert_main(["-o", "seqxml", fikk_cma]) == 0
+    out = capsysbinary.readouterr().out
+    records = AlignIO.read(io.BytesIO(out), "seqxml")
+    assert [rec.id for rec in records] == [
+        seq["id"] for seq in cma.read(fikk_cma)["sequences"]
+    ]
+
+
+def test_convert_refuses_several_alignments_in_binary_format(aaaplus_sma, capsys):
+    # Biopython would write one seqxml document for each of the blocks
+    assert cli.convert_main(["-o", "seqxml", aaaplus_sma]) == 1
+    out, err = capsys.readouterr()
+    assert out == ""
+    assert err.startswith("cma-convert: error: A seqxml file holds one alignment")
 
 
 @pytest.mark.parametrize("option", ["-o", "-i"])
