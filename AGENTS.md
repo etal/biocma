@@ -83,6 +83,3 @@ CI also runs the suite at the declared dependency floors with `UV_RESOLUTION=low
 - Commit directly to `master`, without a feature branch or pull request.
 - Commit messages: an imperative subject line, then a short paragraph on what changed and why; American English.
 - In Markdown files, put each sentence on its own line.
-- Maintainer planning for this repository lives in a local beads store that is excluded from git and is not present in a clone.
-  If you have `bd`, run `bd prime --mcp`; `bd memories <keyword>` searches the full text, and `bd recall <key>` prints one memory.
-  If you do not have `bd`, nothing here depends on it.
