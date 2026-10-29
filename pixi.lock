@@ -1780,5 +1780,5 @@ packages:
 - pypi: ./
   name: biocma
   requires_dist:
-  - biopython>=1.86
+  - biopython>=1.87
   requires_python: '>=3.12'

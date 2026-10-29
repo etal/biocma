@@ -16,7 +16,7 @@ Biopython objects and conventions are used where possible.
 Installation
 ------------
 
-BioCMA requires Python 3.12 or later and Biopython 1.86 or later. Install it
+BioCMA requires Python 3.12 or later and Biopython 1.87 or later. Install it
 from a source checkout with::
 
     pip install .

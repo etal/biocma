@@ -75,6 +75,7 @@ CI also runs the suite at the declared dependency floors with `UV_RESOLUTION=low
 - Library modules log through `logging.getLogger(__name__)`.
 - Runtime dependency floors default to the versions that the current Ubuntu LTS (26.04) ships; raise one only for a concrete problem, such as a security advisory or a conflict.
   The Python floor, 3.12, is a separate decision.
+  Biopython's floor is 1.87, one version above the LTS: Biopython 1.86 reads UniProt XML from a text handle with a deprecation warning instead of raising `StreamModeError`, so `convert` never repeats the read in binary mode and reads such input as text.
   After a change to a dependency, update both `uv.lock` and `pixi.lock`.
 
 ## Conventions

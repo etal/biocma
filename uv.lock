@@ -85,7 +85,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "biopython", specifier = ">=1.86" }]
+requires-dist = [{ name = "biopython", specifier = ">=1.87" }]
 
 [package.metadata.requires-dev]
 dev = [
